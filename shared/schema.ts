@@ -357,6 +357,84 @@ export const journalEntries = sqliteTable("journal_entries", {
   createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
 });
 
+// Manufacturing Module
+export const productionOrders = sqliteTable("production_orders", {
+  id: text("id").primaryKey().$default(() => generateUUID()),
+  name: text("name").notNull(),
+  productId: text("product_id").references(() => products.id),
+  quantity: text("quantity").notNull(),
+  unit: text("unit").default("pcs"),
+  state: text("state").default("draft"),
+  priority: text("priority").default("normal"),
+  plannedStartDate: integer("planned_start_date", { mode: "timestamp" }),
+  plannedEndDate: integer("planned_end_date", { mode: "timestamp" }),
+  actualStartDate: integer("actual_start_date", { mode: "timestamp" }),
+  actualEndDate: integer("actual_end_date", { mode: "timestamp" }),
+  managerId: text("manager_id").references(() => users.id),
+  companyId: text("company_id").references(() => companies.id),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const workOrders = sqliteTable("work_orders", {
+  id: text("id").primaryKey().$default(() => generateUUID()),
+  name: text("name").notNull(),
+  productionOrderId: text("production_order_id").references(() => productionOrders.id),
+  workCenterId: text("work_center_id"),
+  operation: text("operation").notNull(),
+  quantity: text("quantity").notNull(),
+  unit: text("unit").default("pcs"),
+  state: text("state").default("pending"),
+  plannedStartDate: integer("planned_start_date", { mode: "timestamp" }),
+  plannedEndDate: integer("planned_end_date", { mode: "timestamp" }),
+  actualStartDate: integer("actual_start_date", { mode: "timestamp" }),
+  actualEndDate: integer("actual_end_date", { mode: "timestamp" }),
+  assignedTo: text("assigned_to").references(() => users.id),
+  companyId: text("company_id").references(() => companies.id),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const workCenters = sqliteTable("work_centers", {
+  id: text("id").primaryKey().$default(() => generateUUID()),
+  name: text("name").notNull(),
+  code: text("code").notNull().unique(),
+  type: text("type").notNull(),
+  capacity: text("capacity").default("1"),
+  efficiency: text("efficiency").default("100"),
+  status: text("status").default("active"),
+  location: text("location"),
+  companyId: text("company_id").references(() => companies.id),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const billOfMaterials = sqliteTable("bill_of_materials", {
+  id: text("id").primaryKey().$default(() => generateUUID()),
+  productId: text("product_id").references(() => products.id),
+  componentId: text("component_id").references(() => products.id),
+  quantity: text("quantity").notNull(),
+  unit: text("unit").default("pcs"),
+  version: text("version").default("1"),
+  isActive: integer("is_active", { mode: "boolean" }).default(true),
+  companyId: text("company_id").references(() => companies.id),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const manufacturingOperations = sqliteTable("manufacturing_operations", {
+  id: text("id").primaryKey().$default(() => generateUUID()),
+  workOrderId: text("work_order_id").references(() => workOrders.id),
+  name: text("name").notNull(),
+  description: text("description"),
+  sequence: integer("sequence").notNull(),
+  duration: text("duration").notNull(),
+  unit: text("unit").default("minutes"),
+  state: text("state").default("pending"),
+  actualDuration: text("actual_duration"),
+  completedAt: integer("completed_at", { mode: "timestamp" }),
+  companyId: text("company_id").references(() => companies.id),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
+});
+
 // Activities and Calendar
 export const activities = sqliteTable("activities", {
   id: text("id").primaryKey().$default(() => generateUUID()),
@@ -396,6 +474,11 @@ export const insertEquipmentSchema = createInsertSchema(equipment);
 export const insertMaintenanceRequestSchema = createInsertSchema(maintenanceRequests);
 export const insertAccountSchema = createInsertSchema(accounts);
 export const insertJournalEntrySchema = createInsertSchema(journalEntries);
+export const insertProductionOrderSchema = createInsertSchema(productionOrders);
+export const insertWorkOrderSchema = createInsertSchema(workOrders);
+export const insertWorkCenterSchema = createInsertSchema(workCenters);
+export const insertBillOfMaterialSchema = createInsertSchema(billOfMaterials);
+export const insertManufacturingOperationSchema = createInsertSchema(manufacturingOperations);
 
 // Type exports
 export type Company = typeof companies.$inferSelect;
@@ -446,3 +529,13 @@ export type Account = typeof accounts.$inferSelect;
 export type InsertAccount = z.infer<typeof insertAccountSchema>;
 export type JournalEntry = typeof journalEntries.$inferSelect;
 export type InsertJournalEntry = z.infer<typeof insertJournalEntrySchema>;
+export type ProductionOrder = typeof productionOrders.$inferSelect;
+export type InsertProductionOrder = z.infer<typeof insertProductionOrderSchema>;
+export type WorkOrder = typeof workOrders.$inferSelect;
+export type InsertWorkOrder = z.infer<typeof insertWorkOrderSchema>;
+export type WorkCenter = typeof workCenters.$inferSelect;
+export type InsertWorkCenter = z.infer<typeof insertWorkCenterSchema>;
+export type BillOfMaterial = typeof billOfMaterials.$inferSelect;
+export type InsertBillOfMaterial = z.infer<typeof insertBillOfMaterialSchema>;
+export type ManufacturingOperation = typeof manufacturingOperations.$inferSelect;
+export type InsertManufacturingOperation = z.infer<typeof insertManufacturingOperationSchema>;

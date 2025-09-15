@@ -8,7 +8,9 @@ import {
   insertPurchaseOrderSchema, insertEventSchema, insertEventRegistrationSchema,
   insertDocumentSchema, insertDocumentFolderSchema, insertVehicleSchema,
   insertVehicleMaintenanceSchema, insertApprovalRequestSchema, insertApprovalWorkflowSchema,
-  insertEquipmentSchema, insertMaintenanceRequestSchema, insertUserSchema, insertCompanySchema
+  insertEquipmentSchema, insertMaintenanceRequestSchema, insertUserSchema, insertCompanySchema,
+  insertProductionOrderSchema, insertWorkOrderSchema, insertWorkCenterSchema,
+  insertBillOfMaterialSchema, insertManufacturingOperationSchema
 } from "@shared/schema";
 import bcrypt from "bcryptjs";
 
@@ -916,6 +918,222 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(204).send();
     } catch (error) {
       res.status(400).json({ error: "Failed to delete task" });
+    }
+  });
+
+  // Manufacturing endpoints
+  app.get("/api/production-orders", async (req, res) => {
+    try {
+      const orders = await storage.getProductionOrders(currentCompanyId);
+      res.json(orders);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch production orders" });
+    }
+  });
+
+  app.post("/api/production-orders", async (req, res) => {
+    try {
+      const validatedData = insertProductionOrderSchema.parse(req.body);
+      const order = await storage.createProductionOrder({
+        ...validatedData,
+        companyId: currentCompanyId
+      });
+      res.status(201).json(order);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid production order data" });
+    }
+  });
+
+  app.patch("/api/production-orders/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const validatedData = insertProductionOrderSchema.partial().parse(req.body);
+      const order = await storage.updateProductionOrder(id, validatedData);
+      res.json(order);
+    } catch (error) {
+      res.status(400).json({ error: "Failed to update production order" });
+    }
+  });
+
+  app.delete("/api/production-orders/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteProductionOrder(id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(400).json({ error: "Failed to delete production order" });
+    }
+  });
+
+  app.get("/api/work-orders", async (req, res) => {
+    try {
+      const orders = await storage.getWorkOrders(currentCompanyId);
+      res.json(orders);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch work orders" });
+    }
+  });
+
+  app.post("/api/work-orders", async (req, res) => {
+    try {
+      const validatedData = insertWorkOrderSchema.parse(req.body);
+      const order = await storage.createWorkOrder({
+        ...validatedData,
+        companyId: currentCompanyId
+      });
+      res.status(201).json(order);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid work order data" });
+    }
+  });
+
+  app.patch("/api/work-orders/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const validatedData = insertWorkOrderSchema.partial().parse(req.body);
+      const order = await storage.updateWorkOrder(id, validatedData);
+      res.json(order);
+    } catch (error) {
+      res.status(400).json({ error: "Failed to update work order" });
+    }
+  });
+
+  app.delete("/api/work-orders/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteWorkOrder(id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(400).json({ error: "Failed to delete work order" });
+    }
+  });
+
+  app.get("/api/work-centers", async (req, res) => {
+    try {
+      const centers = await storage.getWorkCenters(currentCompanyId);
+      res.json(centers);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch work centers" });
+    }
+  });
+
+  app.post("/api/work-centers", async (req, res) => {
+    try {
+      const validatedData = insertWorkCenterSchema.parse(req.body);
+      const center = await storage.createWorkCenter({
+        ...validatedData,
+        companyId: currentCompanyId
+      });
+      res.status(201).json(center);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid work center data" });
+    }
+  });
+
+  app.patch("/api/work-centers/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const validatedData = insertWorkCenterSchema.partial().parse(req.body);
+      const center = await storage.updateWorkCenter(id, validatedData);
+      res.json(center);
+    } catch (error) {
+      res.status(400).json({ error: "Failed to update work center" });
+    }
+  });
+
+  app.delete("/api/work-centers/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteWorkCenter(id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(400).json({ error: "Failed to delete work center" });
+    }
+  });
+
+  app.get("/api/bill-of-materials", async (req, res) => {
+    try {
+      const boms = await storage.getBillOfMaterials(currentCompanyId);
+      res.json(boms);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch bill of materials" });
+    }
+  });
+
+  app.post("/api/bill-of-materials", async (req, res) => {
+    try {
+      const validatedData = insertBillOfMaterialSchema.parse(req.body);
+      const bom = await storage.createBillOfMaterial({
+        ...validatedData,
+        companyId: currentCompanyId
+      });
+      res.status(201).json(bom);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid bill of material data" });
+    }
+  });
+
+  app.patch("/api/bill-of-materials/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const validatedData = insertBillOfMaterialSchema.partial().parse(req.body);
+      const bom = await storage.updateBillOfMaterial(id, validatedData);
+      res.json(bom);
+    } catch (error) {
+      res.status(400).json({ error: "Failed to update bill of material" });
+    }
+  });
+
+  app.delete("/api/bill-of-materials/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteBillOfMaterial(id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(400).json({ error: "Failed to delete bill of material" });
+    }
+  });
+
+  app.get("/api/manufacturing-operations", async (req, res) => {
+    try {
+      const operations = await storage.getManufacturingOperations(currentCompanyId);
+      res.json(operations);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch manufacturing operations" });
+    }
+  });
+
+  app.post("/api/manufacturing-operations", async (req, res) => {
+    try {
+      const validatedData = insertManufacturingOperationSchema.parse(req.body);
+      const operation = await storage.createManufacturingOperation({
+        ...validatedData,
+        companyId: currentCompanyId
+      });
+      res.status(201).json(operation);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid manufacturing operation data" });
+    }
+  });
+
+  app.patch("/api/manufacturing-operations/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const validatedData = insertManufacturingOperationSchema.partial().parse(req.body);
+      const operation = await storage.updateManufacturingOperation(id, validatedData);
+      res.json(operation);
+    } catch (error) {
+      res.status(400).json({ error: "Failed to update manufacturing operation" });
+    }
+  });
+
+  app.delete("/api/manufacturing-operations/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteManufacturingOperation(id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(400).json({ error: "Failed to delete manufacturing operation" });
     }
   });
 

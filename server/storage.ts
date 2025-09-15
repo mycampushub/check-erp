@@ -10,10 +10,14 @@ import {
   type Vehicle, type InsertVehicle, type VehicleMaintenance, type InsertVehicleMaintenance,
   type ApprovalRequest, type InsertApprovalRequest, type ApprovalWorkflow, type InsertApprovalWorkflow,
   type Equipment, type InsertEquipment, type MaintenanceRequest, type InsertMaintenanceRequest,
+  type ProductionOrder, type InsertProductionOrder, type WorkOrder, type InsertWorkOrder,
+  type WorkCenter, type InsertWorkCenter, type BillOfMaterial, type InsertBillOfMaterial,
+  type ManufacturingOperation, type InsertManufacturingOperation,
   companies, users, leads, opportunities, partners, products, inventory,
   salesOrders, projects, tasks, employees, activities, purchaseOrders,
   events, eventRegistrations, documents, documentFolders, vehicles, vehicleMaintenance,
-  approvalRequests, approvalWorkflows, equipment, maintenanceRequests
+  approvalRequests, approvalWorkflows, equipment, maintenanceRequests,
+  productionOrders, workOrders, workCenters, billOfMaterials, manufacturingOperations
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and } from "drizzle-orm";
@@ -146,6 +150,28 @@ export interface IStorage {
   createMaintenanceRequest(request: InsertMaintenanceRequest): Promise<MaintenanceRequest>;
   updateMaintenanceRequest(id: string, request: Partial<InsertMaintenanceRequest>): Promise<MaintenanceRequest>;
   deleteMaintenanceRequest(id: string): Promise<void>;
+
+  // Manufacturing
+  getProductionOrders(companyId: string): Promise<ProductionOrder[]>;
+  createProductionOrder(order: InsertProductionOrder): Promise<ProductionOrder>;
+  updateProductionOrder(id: string, order: Partial<InsertProductionOrder>): Promise<ProductionOrder>;
+  deleteProductionOrder(id: string): Promise<void>;
+  getWorkOrders(companyId: string): Promise<WorkOrder[]>;
+  createWorkOrder(order: InsertWorkOrder): Promise<WorkOrder>;
+  updateWorkOrder(id: string, order: Partial<InsertWorkOrder>): Promise<WorkOrder>;
+  deleteWorkOrder(id: string): Promise<void>;
+  getWorkCenters(companyId: string): Promise<WorkCenter[]>;
+  createWorkCenter(center: InsertWorkCenter): Promise<WorkCenter>;
+  updateWorkCenter(id: string, center: Partial<InsertWorkCenter>): Promise<WorkCenter>;
+  deleteWorkCenter(id: string): Promise<void>;
+  getBillOfMaterials(companyId: string): Promise<BillOfMaterial[]>;
+  createBillOfMaterial(bom: InsertBillOfMaterial): Promise<BillOfMaterial>;
+  updateBillOfMaterial(id: string, bom: Partial<InsertBillOfMaterial>): Promise<BillOfMaterial>;
+  deleteBillOfMaterial(id: string): Promise<void>;
+  getManufacturingOperations(companyId: string): Promise<ManufacturingOperation[]>;
+  createManufacturingOperation(operation: InsertManufacturingOperation): Promise<ManufacturingOperation>;
+  updateManufacturingOperation(id: string, operation: Partial<InsertManufacturingOperation>): Promise<ManufacturingOperation>;
+  deleteManufacturingOperation(id: string): Promise<void>;
 
   // Auth helpers
   validatePassword(plainPassword: string, hashedPassword: string): Promise<boolean>;
@@ -940,6 +966,129 @@ export class DatabaseStorage implements IStorage {
 
   async deleteMaintenanceRequest(id: string): Promise<void> {
     await db.delete(maintenanceRequests).where(eq(maintenanceRequests.id, id));
+  }
+
+  // Manufacturing methods
+  async getProductionOrders(companyId: string): Promise<ProductionOrder[]> {
+    return await db.select().from(productionOrders).where(eq(productionOrders.companyId, companyId));
+  }
+
+  async createProductionOrder(insertOrder: InsertProductionOrder): Promise<ProductionOrder> {
+    const [order] = await db.insert(productionOrders).values({
+      ...insertOrder,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    }).returning();
+    return order;
+  }
+
+  async updateProductionOrder(id: string, updateData: Partial<InsertProductionOrder>): Promise<ProductionOrder> {
+    const [order] = await db.update(productionOrders)
+      .set({ ...updateData, updatedAt: new Date() })
+      .where(eq(productionOrders.id, id))
+      .returning();
+    return order;
+  }
+
+  async deleteProductionOrder(id: string): Promise<void> {
+    await db.delete(productionOrders).where(eq(productionOrders.id, id));
+  }
+
+  async getWorkOrders(companyId: string): Promise<WorkOrder[]> {
+    return await db.select().from(workOrders).where(eq(workOrders.companyId, companyId));
+  }
+
+  async createWorkOrder(insertOrder: InsertWorkOrder): Promise<WorkOrder> {
+    const [order] = await db.insert(workOrders).values({
+      ...insertOrder,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    }).returning();
+    return order;
+  }
+
+  async updateWorkOrder(id: string, updateData: Partial<InsertWorkOrder>): Promise<WorkOrder> {
+    const [order] = await db.update(workOrders)
+      .set({ ...updateData, updatedAt: new Date() })
+      .where(eq(workOrders.id, id))
+      .returning();
+    return order;
+  }
+
+  async deleteWorkOrder(id: string): Promise<void> {
+    await db.delete(workOrders).where(eq(workOrders.id, id));
+  }
+
+  async getWorkCenters(companyId: string): Promise<WorkCenter[]> {
+    return await db.select().from(workCenters).where(eq(workCenters.companyId, companyId));
+  }
+
+  async createWorkCenter(insertCenter: InsertWorkCenter): Promise<WorkCenter> {
+    const [center] = await db.insert(workCenters).values({
+      ...insertCenter,
+      createdAt: new Date()
+    }).returning();
+    return center;
+  }
+
+  async updateWorkCenter(id: string, updateData: Partial<InsertWorkCenter>): Promise<WorkCenter> {
+    const [center] = await db.update(workCenters)
+      .set(updateData)
+      .where(eq(workCenters.id, id))
+      .returning();
+    return center;
+  }
+
+  async deleteWorkCenter(id: string): Promise<void> {
+    await db.delete(workCenters).where(eq(workCenters.id, id));
+  }
+
+  async getBillOfMaterials(companyId: string): Promise<BillOfMaterial[]> {
+    return await db.select().from(billOfMaterials).where(eq(billOfMaterials.companyId, companyId));
+  }
+
+  async createBillOfMaterial(insertBom: InsertBillOfMaterial): Promise<BillOfMaterial> {
+    const [bom] = await db.insert(billOfMaterials).values({
+      ...insertBom,
+      createdAt: new Date()
+    }).returning();
+    return bom;
+  }
+
+  async updateBillOfMaterial(id: string, updateData: Partial<InsertBillOfMaterial>): Promise<BillOfMaterial> {
+    const [bom] = await db.update(billOfMaterials)
+      .set(updateData)
+      .where(eq(billOfMaterials.id, id))
+      .returning();
+    return bom;
+  }
+
+  async deleteBillOfMaterial(id: string): Promise<void> {
+    await db.delete(billOfMaterials).where(eq(billOfMaterials.id, id));
+  }
+
+  async getManufacturingOperations(companyId: string): Promise<ManufacturingOperation[]> {
+    return await db.select().from(manufacturingOperations).where(eq(manufacturingOperations.companyId, companyId));
+  }
+
+  async createManufacturingOperation(insertOperation: InsertManufacturingOperation): Promise<ManufacturingOperation> {
+    const [operation] = await db.insert(manufacturingOperations).values({
+      ...insertOperation,
+      createdAt: new Date()
+    }).returning();
+    return operation;
+  }
+
+  async updateManufacturingOperation(id: string, updateData: Partial<InsertManufacturingOperation>): Promise<ManufacturingOperation> {
+    const [operation] = await db.update(manufacturingOperations)
+      .set(updateData)
+      .where(eq(manufacturingOperations.id, id))
+      .returning();
+    return operation;
+  }
+
+  async deleteManufacturingOperation(id: string): Promise<void> {
+    await db.delete(manufacturingOperations).where(eq(manufacturingOperations.id, id));
   }
 }
 

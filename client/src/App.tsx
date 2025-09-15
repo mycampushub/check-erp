@@ -30,6 +30,10 @@ import Social from "@/pages/social";
 import SMS from "@/pages/sms";
 import Approvals from "@/pages/approvals";
 import Maintenance from "@/pages/maintenance";
+import Quality from "@/pages/quality";
+import PLM from "@/pages/plm";
+import BarcodePage from "@/pages/barcode";
+import IoT from "@/pages/iot";
 import Auth from "@/pages/auth";
 import NotFound from "@/pages/not-found";
 
@@ -79,6 +83,10 @@ function ProtectedRouter() {
         <Route path="/sms" component={SMS} />
         <Route path="/approvals" component={Approvals} />
         <Route path="/maintenance" component={Maintenance} />
+        <Route path="/quality" component={Quality} />
+        <Route path="/plm" component={PLM} />
+        <Route path="/barcode" component={BarcodePage} />
+        <Route path="/iot" component={IoT} />
         <Route component={NotFound} />
       </Switch>
     </MainLayout>
