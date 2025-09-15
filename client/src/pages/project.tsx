@@ -1,15 +1,54 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import ViewTabs from "@/components/common/view-tabs";
-import { Plus, Search, Filter, FolderOpen, Users, Calendar, CheckCircle } from "lucide-react";
+import { Plus, Search, Filter, FolderOpen, Users, Calendar, CheckCircle, Edit, Trash2 } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { useToast } from "@/hooks/use-toast";
+
+const projectSchema = z.object({
+  name: z.string().min(1, "Project name is required"),
+  description: z.string().optional(),
+  partnerId: z.string().optional(),
+  managerId: z.string().optional(),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+  state: z.string().default("active"),
+});
+
+const taskSchema = z.object({
+  name: z.string().min(1, "Task name is required"),
+  description: z.string().optional(),
+  projectId: z.string().min(1, "Project is required"),
+  assignedTo: z.string().optional(),
+  stage: z.string().default("todo"),
+  priority: z.string().default("normal"),
+  dueDate: z.string().optional(),
+});
+
+type ProjectForm = z.infer<typeof projectSchema>;
+type TaskForm = z.infer<typeof taskSchema>;
 
 export default function Project() {
   const [view, setView] = useState("kanban");
   const [searchTerm, setSearchTerm] = useState("");
+  const [isProjectDialogOpen, setIsProjectDialogOpen] = useState(false);
+  const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
+  const [editingProject, setEditingProject] = useState<any>(null);
+  const [editingTask, setEditingTask] = useState<any>(null);
+  const [isEditProjectDialogOpen, setIsEditProjectDialogOpen] = useState(false);
+  const [isEditTaskDialogOpen, setIsEditTaskDialogOpen] = useState(false);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const { data: projects = [], isLoading: projectsLoading } = useQuery<any[]>({
     queryKey: ["/api/projects"],
@@ -17,6 +56,133 @@ export default function Project() {
 
   const { data: tasks = [], isLoading: tasksLoading } = useQuery<any[]>({
     queryKey: ["/api/tasks"],
+  });
+
+  const { data: users = [] } = useQuery<any[]>({
+    queryKey: ["/api/users"],
+  });
+
+  const { data: partners = [] } = useQuery<any[]>({
+    queryKey: ["/api/partners"],
+  });
+
+  // Project mutations
+  const createProjectMutation = useMutation({
+    mutationFn: async (data: ProjectForm) => {
+      const response = await fetch('/api/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error('Failed to create project');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects'] });
+      setIsProjectDialogOpen(false);
+      toast({ title: "Success", description: "Project created successfully" });
+    },
+    onError: (error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const updateProjectMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: ProjectForm }) => {
+      const response = await fetch(`/api/projects/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error('Failed to update project');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects'] });
+      setIsEditProjectDialogOpen(false);
+      setEditingProject(null);
+      toast({ title: "Success", description: "Project updated successfully" });
+    },
+    onError: (error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteProjectMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await fetch(`/api/projects/${id}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) throw new Error('Failed to delete project');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/tasks'] });
+      toast({ title: "Success", description: "Project deleted successfully" });
+    },
+    onError: (error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Task mutations
+  const createTaskMutation = useMutation({
+    mutationFn: async (data: TaskForm) => {
+      const response = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error('Failed to create task');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/tasks'] });
+      setIsTaskDialogOpen(false);
+      toast({ title: "Success", description: "Task created successfully" });
+    },
+    onError: (error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const updateTaskMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: TaskForm }) => {
+      const response = await fetch(`/api/tasks/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error('Failed to update task');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/tasks'] });
+      setIsEditTaskDialogOpen(false);
+      setEditingTask(null);
+      toast({ title: "Success", description: "Task updated successfully" });
+    },
+    onError: (error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteTaskMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await fetch(`/api/tasks/${id}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) throw new Error('Failed to delete task');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/tasks'] });
+      toast({ title: "Success", description: "Task deleted successfully" });
+    },
+    onError: (error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
   });
 
   const filteredProjects = projects.filter((project: any) =>
@@ -40,11 +206,11 @@ export default function Project() {
           <p className="text-muted-foreground">Plan, track, and manage your projects and tasks</p>
         </div>
         <div className="flex space-x-2">
-          <Button variant="outline" data-testid="button-create-task">
+          <Button variant="outline" onClick={() => setIsTaskDialogOpen(true)} data-testid="button-create-task">
             <Plus className="w-4 h-4 mr-2" />
             New Task
           </Button>
-          <Button data-testid="button-create-project">
+          <Button onClick={() => setIsProjectDialogOpen(true)} data-testid="button-create-project">
             <Plus className="w-4 h-4 mr-2" />
             New Project
           </Button>
@@ -241,6 +407,202 @@ export default function Project() {
           </CardContent>
         </Card>
       )}
+      
+      {/* Create Project Dialog */}
+      <Dialog open={isProjectDialogOpen} onOpenChange={setIsProjectDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Create New Project</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={(e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target as HTMLFormElement);
+            const data = Object.fromEntries(formData);
+            createProjectMutation.mutate(data as ProjectForm);
+          }} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="project-name">Project Name *</Label>
+              <Input id="project-name" name="name" placeholder="Enter project name" required />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="project-description">Description</Label>
+              <Textarea id="project-description" name="description" placeholder="Project description" />
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="project-start">Start Date</Label>
+                <Input id="project-start" name="startDate" type="date" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="project-end">End Date</Label>
+                <Input id="project-end" name="endDate" type="date" />
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="project-partner">Customer/Partner</Label>
+              <Select name="partnerId">
+                <SelectTrigger>
+                  <SelectValue placeholder="Select customer" />
+                </SelectTrigger>
+                <SelectContent>
+                  {partners.filter((p: any) => p.isCustomer).map((partner: any) => (
+                    <SelectItem key={partner.id} value={partner.id}>
+                      {partner.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="project-manager">Project Manager</Label>
+              <Select name="managerId">
+                <SelectTrigger>
+                  <SelectValue placeholder="Select manager" />
+                </SelectTrigger>
+                <SelectContent>
+                  {users.map((user: any) => (
+                    <SelectItem key={user.id} value={user.id}>
+                      {user.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="project-state">Status</Label>
+              <Select name="state" defaultValue="active">
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="on-hold">On Hold</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="flex space-x-2">
+              <Button type="submit" className="flex-1" disabled={createProjectMutation.isPending}>
+                {createProjectMutation.isPending ? "Creating..." : "Create Project"}
+              </Button>
+              <Button type="button" variant="outline" onClick={() => setIsProjectDialogOpen(false)}>
+                Cancel
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Task Dialog */}
+      <Dialog open={isTaskDialogOpen} onOpenChange={setIsTaskDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Create New Task</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={(e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target as HTMLFormElement);
+            const data = Object.fromEntries(formData);
+            createTaskMutation.mutate(data as TaskForm);
+          }} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="task-name">Task Name *</Label>
+              <Input id="task-name" name="name" placeholder="Enter task name" required />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="task-description">Description</Label>
+              <Textarea id="task-description" name="description" placeholder="Task description" />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="task-project">Project *</Label>
+              <Select name="projectId" required>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select project" />
+                </SelectTrigger>
+                <SelectContent>
+                  {projects.map((project: any) => (
+                    <SelectItem key={project.id} value={project.id}>
+                      {project.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="task-assignee">Assign To</Label>
+                <Select name="assignedTo">
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select assignee" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {users.map((user: any) => (
+                      <SelectItem key={user.id} value={user.id}>
+                        {user.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="task-priority">Priority</Label>
+                <Select name="priority" defaultValue="normal">
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="normal">Normal</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="urgent">Urgent</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="task-stage">Stage</Label>
+                <Select name="stage" defaultValue="todo">
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todo">To Do</SelectItem>
+                    <SelectItem value="doing">In Progress</SelectItem>
+                    <SelectItem value="done">Done</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="task-due">Due Date</Label>
+                <Input id="task-due" name="dueDate" type="date" />
+              </div>
+            </div>
+            
+            <div className="flex space-x-2">
+              <Button type="submit" className="flex-1" disabled={createTaskMutation.isPending}>
+                {createTaskMutation.isPending ? "Creating..." : "Create Task"}
+              </Button>
+              <Button type="button" variant="outline" onClick={() => setIsTaskDialogOpen(false)}>
+                Cancel
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import ViewTabs from "@/components/common/view-tabs";
-import { Plus, Search, Filter, Package, AlertTriangle, Truck, Save, DollarSign } from "lucide-react";
+import { Plus, Search, Filter, Package, AlertTriangle, Truck, Save, DollarSign, Edit, Trash2, Settings } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -42,6 +42,8 @@ export default function Inventory() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isProductDialogOpen, setIsProductDialogOpen] = useState(false);
   const [isInventoryDialogOpen, setIsInventoryDialogOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<any>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -93,6 +95,44 @@ export default function Inventory() {
     },
   });
 
+  const updateProductMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: ProductForm }) => {
+      const response = await fetch(`/api/products/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error('Failed to update product');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/products'] });
+      setIsEditDialogOpen(false);
+      setEditingProduct(null);
+      toast({ title: "Success", description: "Product updated successfully" });
+    },
+    onError: (error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteProductMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await fetch(`/api/products/${id}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) throw new Error('Failed to delete product');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/products'] });
+      toast({ title: "Success", description: "Product deleted successfully" });
+    },
+    onError: (error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
   const productForm = useForm<ProductForm>({
     resolver: zodResolver(productSchema),
     defaultValues: {
@@ -109,6 +149,36 @@ export default function Inventory() {
       quantityReserved: "0",
     },
   });
+
+  const editForm = useForm<ProductForm>({
+    resolver: zodResolver(productSchema),
+    defaultValues: {
+      type: "storable",
+      active: true,
+    },
+  });
+
+  const handleEditProduct = (product: any) => {
+    setEditingProduct(product);
+    editForm.reset({
+      name: product.name,
+      internalReference: product.internalReference || "",
+      barcode: product.barcode || "",
+      salePrice: product.salePrice || "",
+      cost: product.cost || "",
+      category: product.category || "",
+      type: product.type || "storable",
+      description: product.description || "",
+      active: product.active,
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  const handleDeleteProduct = (productId: string) => {
+    if (window.confirm("Are you sure you want to delete this product? This action cannot be undone.")) {
+      deleteProductMutation.mutate(productId);
+    }
+  };
 
   const filteredProducts = products.filter((product: any) =>
     product.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -433,6 +503,30 @@ export default function Inventory() {
                           <Badge variant="outline" className="border-orange-500 text-orange-600">Low Stock</Badge>
                         )}
                       </div>
+                      <div className="flex items-center space-x-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditProduct(product);
+                          }}
+                          data-testid={`button-edit-product-${product.id}`}
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteProduct(product.id);
+                          }}
+                          data-testid={`button-delete-product-${product.id}`}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 );
@@ -441,6 +535,104 @@ export default function Inventory() {
           )}
         </CardContent>
       </Card>
+      
+      {/* Edit Product Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Edit Product</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={editForm.handleSubmit((data) => updateProductMutation.mutate({ id: editingProduct?.id, data }))} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-name">Product Name *</Label>
+              <Input {...editForm.register("name")} placeholder="Product name" />
+              {editForm.formState.errors.name && (
+                <p className="text-sm text-red-500">{editForm.formState.errors.name.message}</p>
+              )}
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-internalReference">Internal Reference</Label>
+                <Input {...editForm.register("internalReference")} placeholder="SKU/Reference" />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="edit-barcode">Barcode</Label>
+                <Input {...editForm.register("barcode")} placeholder="Barcode" />
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-salePrice">Sale Price</Label>
+                <Input {...editForm.register("salePrice")} type="number" step="0.01" placeholder="0.00" />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="edit-cost">Cost</Label>
+                <Input {...editForm.register("cost")} type="number" step="0.01" placeholder="0.00" />
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="edit-category">Category</Label>
+              <Select onValueChange={(value) => editForm.setValue("category", value)} defaultValue={editingProduct?.category || ""}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="electronics">Electronics</SelectItem>
+                  <SelectItem value="clothing">Clothing</SelectItem>
+                  <SelectItem value="food">Food & Beverage</SelectItem>
+                  <SelectItem value="books">Books</SelectItem>
+                  <SelectItem value="tools">Tools</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="edit-type">Type</Label>
+              <Select onValueChange={(value) => editForm.setValue("type", value)} defaultValue={editingProduct?.type || "storable"}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="storable">Storable</SelectItem>
+                  <SelectItem value="consumable">Consumable</SelectItem>
+                  <SelectItem value="service">Service</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="edit-description">Description</Label>
+              <Textarea {...editForm.register("description")} placeholder="Product description" />
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="edit-active"
+                {...editForm.register("active")}
+                className="rounded"
+              />
+              <Label htmlFor="edit-active">Active</Label>
+            </div>
+            
+            <div className="flex space-x-2">
+              <Button type="submit" className="flex-1" disabled={updateProductMutation.isPending}>
+                <Save className="w-4 h-4 mr-2" />
+                {updateProductMutation.isPending ? "Updating..." : "Update Product"}
+              </Button>
+              <Button type="button" variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                Cancel
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

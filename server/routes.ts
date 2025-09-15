@@ -387,6 +387,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Inventory endpoints
+  app.get("/api/inventory", async (req, res) => {
+    try {
+      const inventory = await storage.getInventory(currentCompanyId);
+      res.json(inventory);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch inventory" });
+    }
+  });
+
+  app.post("/api/inventory", async (req, res) => {
+    try {
+      const inventory = await storage.createInventory({
+        ...req.body,
+        companyId: currentCompanyId
+      });
+      res.status(201).json(inventory);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid inventory data" });
+    }
+  });
+
+  app.patch("/api/inventory/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const inventory = await storage.updateInventory(id, req.body);
+      res.json(inventory);
+    } catch (error) {
+      res.status(400).json({ error: "Failed to update inventory" });
+    }
+  });
+
+  app.delete("/api/inventory/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteInventory(id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(400).json({ error: "Failed to delete inventory" });
+    }
+  });
+
   // Activities endpoints
   app.get("/api/activities", async (req, res) => {
     try {
@@ -814,6 +856,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/projects/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const project = await storage.updateProject(id, req.body);
+      res.json(project);
+    } catch (error) {
+      res.status(400).json({ error: "Failed to update project" });
+    }
+  });
+
+  app.delete("/api/projects/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteProject(id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(400).json({ error: "Failed to delete project" });
+    }
+  });
+
   // Tasks endpoints
   app.get("/api/tasks", async (req, res) => {
     try {
@@ -834,6 +896,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(task);
     } catch (error) {
       res.status(400).json({ error: "Invalid task data" });
+    }
+  });
+
+  app.patch("/api/tasks/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const task = await storage.updateTask(id, req.body);
+      res.json(task);
+    } catch (error) {
+      res.status(400).json({ error: "Failed to update task" });
+    }
+  });
+
+  app.delete("/api/tasks/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteTask(id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(400).json({ error: "Failed to delete task" });
     }
   });
 

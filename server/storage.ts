@@ -10,7 +10,7 @@ import {
   type Vehicle, type InsertVehicle, type VehicleMaintenance, type InsertVehicleMaintenance,
   type ApprovalRequest, type InsertApprovalRequest, type ApprovalWorkflow, type InsertApprovalWorkflow,
   type Equipment, type InsertEquipment, type MaintenanceRequest, type InsertMaintenanceRequest,
-  companies, users, leads, opportunities, partners, products,
+  companies, users, leads, opportunities, partners, products, inventory,
   salesOrders, projects, tasks, employees, activities, purchaseOrders,
   events, eventRegistrations, documents, documentFolders, vehicles, vehicleMaintenance,
   approvalRequests, approvalWorkflows, equipment, maintenanceRequests
@@ -55,6 +55,13 @@ export interface IStorage {
   createProduct(product: InsertProduct): Promise<Product>;
   updateProduct(id: string, product: Partial<InsertProduct>): Promise<Product>;
   deleteProduct(id: string): Promise<void>;
+  
+  // Inventory
+  getInventory(companyId: string): Promise<any[]>;
+  getInventoryByProduct(productId: string): Promise<any[]>;
+  createInventory(inventory: any): Promise<any>;
+  updateInventory(id: string, inventory: Partial<any>): Promise<any>;
+  deleteInventory(id: string): Promise<void>;
   
   // Sales
   getSalesOrders(companyId: string): Promise<SalesOrder[]>;
@@ -408,6 +415,46 @@ export class DatabaseStorage implements IStorage {
 
   async deleteProduct(id: string): Promise<void> {
     await db.delete(products).where(eq(products.id, id));
+  }
+
+  // Inventory
+  async getInventory(companyId: string): Promise<any[]> {
+    return await db.select().from(inventory).where(eq(inventory.companyId, companyId));
+  }
+
+  async getInventoryByProduct(productId: string): Promise<any[]> {
+    return await db.select().from(inventory).where(eq(inventory.productId, productId));
+  }
+
+  async createInventory(insertInventory: any): Promise<any> {
+    const [inventoryItem] = await db.insert(inventory).values({
+      ...insertInventory,
+      productId: insertInventory.productId,
+      location: insertInventory.location ?? "WH/Stock",
+      quantityOnHand: insertInventory.quantityOnHand ?? "0",
+      quantityReserved: insertInventory.quantityReserved ?? "0",
+      quantityAvailable: insertInventory.quantityAvailable ?? "0",
+      companyId: insertInventory.companyId
+    }).returning();
+    return inventoryItem;
+  }
+
+  async updateInventory(id: string, updateData: Partial<any>): Promise<any> {
+    const quantityAvailable = (Number(updateData.quantityOnHand || 0) - Number(updateData.quantityReserved || 0)).toString();
+    
+    const [inventoryItem] = await db.update(inventory)
+      .set({ 
+        ...updateData, 
+        quantityAvailable,
+        updatedAt: new Date() 
+      })
+      .where(eq(inventory.id, id))
+      .returning();
+    return inventoryItem;
+  }
+
+  async deleteInventory(id: string): Promise<void> {
+    await db.delete(inventory).where(eq(inventory.id, id));
   }
 
   // Sales
