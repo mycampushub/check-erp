@@ -1,35 +1,44 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, decimal, boolean, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// Helper function to generate UUID
+function generateUUID() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
 // Core Company and User Management
-export const companies = pgTable("companies", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+export const companies = sqliteTable("companies", {
+  id: text("id").primaryKey().$default(() => generateUUID()),
   name: text("name").notNull(),
-  currency: varchar("currency", { length: 3 }).default("USD"),
+  currency: text("currency", { length: 3 }).default("USD"),
   country: text("country"),
   timezone: text("timezone").default("UTC"),
-  settings: jsonb("settings").default({}),
-  createdAt: timestamp("created_at").defaultNow(),
+  settings: text("settings").default("{}"),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
 });
 
-export const users = pgTable("users", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+export const users = sqliteTable("users", {
+  id: text("id").primaryKey().$default(() => generateUUID()),
   username: text("username").notNull().unique(),
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
   name: text("name").notNull(),
-  companyId: varchar("company_id").references(() => companies.id),
-  isActive: boolean("is_active").default(true),
-  roles: jsonb("roles").default([]),
-  settings: jsonb("settings").default({}),
-  createdAt: timestamp("created_at").defaultNow(),
+  companyId: text("company_id").references(() => companies.id),
+  isActive: integer("is_active", { mode: "boolean" }).default(true),
+  roles: text("roles").default("[]"),
+  settings: text("settings").default("{}"),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
 });
 
 // CRM Module
-export const leads = pgTable("leads", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+export const leads = sqliteTable("leads", {
+  id: text("id").primaryKey().$default(() => generateUUID()),
   name: text("name").notNull(),
   email: text("email"),
   phone: text("phone"),
@@ -37,404 +46,403 @@ export const leads = pgTable("leads", {
   source: text("source"),
   stage: text("stage").default("new"),
   probability: integer("probability").default(0),
-  expectedRevenue: decimal("expected_revenue", { precision: 15, scale: 2 }),
+  expectedRevenue: text("expected_revenue"),
   description: text("description"),
-  assignedTo: varchar("assigned_to").references(() => users.id),
-  companyId: varchar("company_id").references(() => companies.id),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
+  assignedTo: text("assigned_to").references(() => users.id),
+  companyId: text("company_id").references(() => companies.id),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
 });
 
-export const opportunities = pgTable("opportunities", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+export const opportunities = sqliteTable("opportunities", {
+  id: text("id").primaryKey().$default(() => generateUUID()),
   name: text("name").notNull(),
-  partnerId: varchar("partner_id").references(() => partners.id),
+  partnerId: text("partner_id").references(() => partners.id),
   stage: text("stage").default("new"),
   probability: integer("probability").default(0),
-  expectedRevenue: decimal("expected_revenue", { precision: 15, scale: 2 }),
-  closeDate: timestamp("close_date"),
-  assignedTo: varchar("assigned_to").references(() => users.id),
-  companyId: varchar("company_id").references(() => companies.id),
+  expectedRevenue: text("expected_revenue"),
+  closeDate: integer("close_date", { mode: "timestamp" }),
+  assignedTo: text("assigned_to").references(() => users.id),
+  companyId: text("company_id").references(() => companies.id),
   description: text("description"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
 });
 
 // Partners (Customers/Vendors)
-export const partners = pgTable("partners", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+export const partners = sqliteTable("partners", {
+  id: text("id").primaryKey().$default(() => generateUUID()),
   name: text("name").notNull(),
   email: text("email"),
   phone: text("phone"),
   website: text("website"),
-  isCustomer: boolean("is_customer").default(true),
-  isVendor: boolean("is_vendor").default(false),
+  isCustomer: integer("is_customer", { mode: "boolean" }).default(true),
+  isVendor: integer("is_vendor", { mode: "boolean" }).default(false),
   street: text("street"),
   city: text("city"),
   state: text("state"),
   zip: text("zip"),
   country: text("country"),
   vatNumber: text("vat_number"),
-  companyId: varchar("company_id").references(() => companies.id),
-  createdAt: timestamp("created_at").defaultNow(),
+  companyId: text("company_id").references(() => companies.id),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
 });
 
 // Products and Inventory
-export const products = pgTable("products", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+export const products = sqliteTable("products", {
+  id: text("id").primaryKey().$default(() => generateUUID()),
   name: text("name").notNull(),
   internalReference: text("internal_reference"),
   barcode: text("barcode"),
-  salePrice: decimal("sale_price", { precision: 15, scale: 2 }),
-  cost: decimal("cost", { precision: 15, scale: 2 }),
+  salePrice: text("sale_price"),
+  cost: text("cost"),
   category: text("category"),
-  type: text("type").default("storable"), // storable, consumable, service
+  type: text("type").default("storable"),
   description: text("description"),
-  active: boolean("active").default(true),
-  companyId: varchar("company_id").references(() => companies.id),
-  createdAt: timestamp("created_at").defaultNow(),
+  active: integer("active", { mode: "boolean" }).default(true),
+  companyId: text("company_id").references(() => companies.id),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
 });
 
-export const inventory = pgTable("inventory", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  productId: varchar("product_id").references(() => products.id),
+export const inventory = sqliteTable("inventory", {
+  id: text("id").primaryKey().$default(() => generateUUID()),
+  productId: text("product_id").references(() => products.id),
   location: text("location").default("WH/Stock"),
-  quantityOnHand: decimal("quantity_on_hand", { precision: 15, scale: 2 }).default("0"),
-  quantityReserved: decimal("quantity_reserved", { precision: 15, scale: 2 }).default("0"),
-  quantityAvailable: decimal("quantity_available", { precision: 15, scale: 2 }).default("0"),
-  companyId: varchar("company_id").references(() => companies.id),
-  updatedAt: timestamp("updated_at").defaultNow(),
+  quantityOnHand: text("quantity_on_hand").default("0"),
+  quantityReserved: text("quantity_reserved").default("0"),
+  quantityAvailable: text("quantity_available").default("0"),
+  companyId: text("company_id").references(() => companies.id),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
 });
 
 // Sales Module
-export const salesOrders = pgTable("sales_orders", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+export const salesOrders = sqliteTable("sales_orders", {
+  id: text("id").primaryKey().$default(() => generateUUID()),
   name: text("name").notNull(),
-  partnerId: varchar("partner_id").references(() => partners.id),
-  state: text("state").default("draft"), // draft, sent, confirmed, done, cancel
-  totalAmount: decimal("total_amount", { precision: 15, scale: 2 }).default("0"),
-  currency: varchar("currency", { length: 3 }).default("USD"),
-  orderDate: timestamp("order_date").defaultNow(),
-  deliveryDate: timestamp("delivery_date"),
-  salespersonId: varchar("salesperson_id").references(() => users.id),
-  companyId: varchar("company_id").references(() => companies.id),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
+  partnerId: text("partner_id").references(() => partners.id),
+  state: text("state").default("draft"),
+  totalAmount: text("total_amount").default("0"),
+  currency: text("currency", { length: 3 }).default("USD"),
+  orderDate: integer("order_date", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
+  deliveryDate: integer("delivery_date", { mode: "timestamp" }),
+  salespersonId: text("salesperson_id").references(() => users.id),
+  companyId: text("company_id").references(() => companies.id),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
 });
 
-export const salesOrderLines = pgTable("sales_order_lines", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  orderId: varchar("order_id").references(() => salesOrders.id),
-  productId: varchar("product_id").references(() => products.id),
-  quantity: decimal("quantity", { precision: 15, scale: 2 }).notNull(),
-  unitPrice: decimal("unit_price", { precision: 15, scale: 2 }).notNull(),
-  discount: decimal("discount", { precision: 5, scale: 2 }).default("0"),
-  subtotal: decimal("subtotal", { precision: 15, scale: 2 }).notNull(),
+export const salesOrderLines = sqliteTable("sales_order_lines", {
+  id: text("id").primaryKey().$default(() => generateUUID()),
+  orderId: text("order_id").references(() => salesOrders.id),
+  productId: text("product_id").references(() => products.id),
+  quantity: text("quantity").notNull(),
+  unitPrice: text("unit_price").notNull(),
+  discount: text("discount").default("0"),
+  subtotal: text("subtotal").notNull(),
 });
 
 // Purchase Module
-export const purchaseOrders = pgTable("purchase_orders", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+export const purchaseOrders = sqliteTable("purchase_orders", {
+  id: text("id").primaryKey().$default(() => generateUUID()),
   name: text("name").notNull(),
-  vendorId: varchar("vendor_id").references(() => partners.id),
+  vendorId: text("vendor_id").references(() => partners.id),
   state: text("state").default("draft"),
-  totalAmount: decimal("total_amount", { precision: 15, scale: 2 }).default("0"),
-  currency: varchar("currency", { length: 3 }).default("USD"),
-  orderDate: timestamp("order_date").defaultNow(),
-  receiptDate: timestamp("receipt_date"),
-  companyId: varchar("company_id").references(() => companies.id),
-  createdAt: timestamp("created_at").defaultNow(),
+  totalAmount: text("total_amount").default("0"),
+  currency: text("currency", { length: 3 }).default("USD"),
+  orderDate: integer("order_date", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
+  receiptDate: integer("receipt_date", { mode: "timestamp" }),
+  companyId: text("company_id").references(() => companies.id),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
 });
 
 // Events Module
-export const events = pgTable("events", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+export const events = sqliteTable("events", {
+  id: text("id").primaryKey().$default(() => generateUUID()),
   name: text("name").notNull(),
   description: text("description"),
-  startDate: timestamp("start_date"),
-  endDate: timestamp("end_date"),
+  startDate: integer("start_date", { mode: "timestamp" }),
+  endDate: integer("end_date", { mode: "timestamp" }),
   venue: text("venue"),
   capacity: integer("capacity"),
-  registrationDeadline: timestamp("registration_deadline"),
-  status: text("status").default("draft"), // draft, published, confirmed, cancelled
-  organizerId: varchar("organizer_id").references(() => users.id),
-  companyId: varchar("company_id").references(() => companies.id),
-  createdAt: timestamp("created_at").defaultNow(),
+  registrationDeadline: integer("registration_deadline", { mode: "timestamp" }),
+  status: text("status").default("draft"),
+  organizerId: text("organizer_id").references(() => users.id),
+  companyId: text("company_id").references(() => companies.id),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
 });
 
-export const eventRegistrations = pgTable("event_registrations", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  eventId: varchar("event_id").references(() => events.id),
+export const eventRegistrations = sqliteTable("event_registrations", {
+  id: text("id").primaryKey().$default(() => generateUUID()),
+  eventId: text("event_id").references(() => events.id),
   attendeeName: text("attendee_name").notNull(),
   attendeeEmail: text("attendee_email").notNull(),
-  registrationDate: timestamp("registration_date").defaultNow(),
-  status: text("status").default("confirmed"), // confirmed, cancelled, attended
-  companyId: varchar("company_id").references(() => companies.id),
+  registrationDate: integer("registration_date", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
+  status: text("status").default("confirmed"),
+  companyId: text("company_id").references(() => companies.id),
 });
 
 // Documents Module
-export const documents = pgTable("documents", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+export const documents = sqliteTable("documents", {
+  id: text("id").primaryKey().$default(() => generateUUID()),
   name: text("name").notNull(),
   fileName: text("file_name").notNull(),
   fileSize: integer("file_size"),
   mimeType: text("mime_type"),
-  folderId: varchar("folder_id"),
-  ownerId: varchar("owner_id").references(() => users.id),
-  tags: jsonb("tags").default([]),
-  isShared: boolean("is_shared").default(false),
-  companyId: varchar("company_id").references(() => companies.id),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
+  folderId: text("folder_id"),
+  ownerId: text("owner_id").references(() => users.id),
+  tags: text("tags").default("[]"),
+  isShared: integer("is_shared", { mode: "boolean" }).default(false),
+  companyId: text("company_id").references(() => companies.id),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
 });
 
-export const documentFolders = pgTable("document_folders", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+export const documentFolders = sqliteTable("document_folders", {
+  id: text("id").primaryKey().$default(() => generateUUID()),
   name: text("name").notNull(),
-  parentId: varchar("parent_id"),
-  ownerId: varchar("owner_id").references(() => users.id),
-  companyId: varchar("company_id").references(() => companies.id),
-  createdAt: timestamp("created_at").defaultNow(),
+  parentId: text("parent_id"),
+  ownerId: text("owner_id").references(() => users.id),
+  companyId: text("company_id").references(() => companies.id),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
 });
 
 // Fleet Module
-export const vehicles = pgTable("vehicles", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+export const vehicles = sqliteTable("vehicles", {
+  id: text("id").primaryKey().$default(() => generateUUID()),
   model: text("model").notNull(),
   year: integer("year"),
   licensePlate: text("license_plate"),
   vin: text("vin"),
-  driverId: varchar("driver_id").references(() => users.id),
-  status: text("status").default("active"), // active, maintenance, inactive
+  driverId: text("driver_id").references(() => users.id),
+  status: text("status").default("active"),
   mileage: integer("mileage").default(0),
   location: text("location"),
-  nextServiceDate: timestamp("next_service_date"),
-  companyId: varchar("company_id").references(() => companies.id),
-  createdAt: timestamp("created_at").defaultNow(),
+  nextServiceDate: integer("next_service_date", { mode: "timestamp" }),
+  companyId: text("company_id").references(() => companies.id),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
 });
 
-export const vehicleMaintenance = pgTable("vehicle_maintenance", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  vehicleId: varchar("vehicle_id").references(() => vehicles.id),
-  type: text("type").notNull(), // repair, preventive, inspection
+export const vehicleMaintenance = sqliteTable("vehicle_maintenance", {
+  id: text("id").primaryKey().$default(() => generateUUID()),
+  vehicleId: text("vehicle_id").references(() => vehicles.id),
+  type: text("type").notNull(),
   description: text("description"),
-  cost: decimal("cost", { precision: 15, scale: 2 }),
-  serviceDate: timestamp("service_date"),
-  nextServiceDate: timestamp("next_service_date"),
-  mechanicId: varchar("mechanic_id").references(() => users.id),
-  status: text("status").default("scheduled"), // scheduled, in_progress, completed
-  companyId: varchar("company_id").references(() => companies.id),
-  createdAt: timestamp("created_at").defaultNow(),
+  cost: text("cost"),
+  serviceDate: integer("service_date", { mode: "timestamp" }),
+  nextServiceDate: integer("next_service_date", { mode: "timestamp" }),
+  mechanicId: text("mechanic_id").references(() => users.id),
+  status: text("status").default("scheduled"),
+  companyId: text("company_id").references(() => companies.id),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
 });
 
 // Approvals Module
-export const approvalRequests = pgTable("approval_requests", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+export const approvalRequests = sqliteTable("approval_requests", {
+  id: text("id").primaryKey().$default(() => generateUUID()),
   title: text("title").notNull(),
   description: text("description"),
-  type: text("type").notNull(), // purchase, time_off, budget, contract
-  amount: decimal("amount", { precision: 15, scale: 2 }),
-  requesterId: varchar("requester_id").references(() => users.id),
-  status: text("status").default("pending"), // pending, approved, rejected, cancelled
-  priority: text("priority").default("medium"), // low, medium, high, urgent
-  companyId: varchar("company_id").references(() => companies.id),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
+  type: text("type").notNull(),
+  amount: text("amount"),
+  requesterId: text("requester_id").references(() => users.id),
+  status: text("status").default("pending"),
+  priority: text("priority").default("medium"),
+  companyId: text("company_id").references(() => companies.id),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
 });
 
-export const approvalWorkflows = pgTable("approval_workflows", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  requestId: varchar("request_id").references(() => approvalRequests.id),
-  approverId: varchar("approver_id").references(() => users.id),
+export const approvalWorkflows = sqliteTable("approval_workflows", {
+  id: text("id").primaryKey().$default(() => generateUUID()),
+  requestId: text("request_id").references(() => approvalRequests.id),
+  approverId: text("approver_id").references(() => users.id),
   order: integer("order").notNull(),
-  status: text("status").default("pending"), // pending, approved, rejected
+  status: text("status").default("pending"),
   comments: text("comments"),
-  actionDate: timestamp("action_date"),
-  companyId: varchar("company_id").references(() => companies.id),
+  actionDate: integer("action_date", { mode: "timestamp" }),
+  companyId: text("company_id").references(() => companies.id),
 });
 
 // Equipment Maintenance Module
-export const equipment = pgTable("equipment", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+export const equipment = sqliteTable("equipment", {
+  id: text("id").primaryKey().$default(() => generateUUID()),
   name: text("name").notNull(),
   serialNumber: text("serial_number"),
   category: text("category"),
   location: text("location"),
-  status: text("status").default("operational"), // operational, maintenance_needed, out_of_service
-  purchaseDate: timestamp("purchase_date"),
-  warrantyExpiry: timestamp("warranty_expiry"),
-  companyId: varchar("company_id").references(() => companies.id),
-  createdAt: timestamp("created_at").defaultNow(),
+  status: text("status").default("operational"),
+  purchaseDate: integer("purchase_date", { mode: "timestamp" }),
+  warrantyExpiry: integer("warranty_expiry", { mode: "timestamp" }),
+  companyId: text("company_id").references(() => companies.id),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
 });
 
-export const maintenanceRequests = pgTable("maintenance_requests", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  equipmentId: varchar("equipment_id").references(() => equipment.id),
+export const maintenanceRequests = sqliteTable("maintenance_requests", {
+  id: text("id").primaryKey().$default(() => generateUUID()),
+  equipmentId: text("equipment_id").references(() => equipment.id),
   title: text("title").notNull(),
   description: text("description"),
-  type: text("type").notNull(), // repair, preventive, inspection
-  priority: text("priority").default("medium"), // low, medium, high, urgent
-  status: text("status").default("pending"), // pending, in_progress, completed, cancelled
-  assignedTo: varchar("assigned_to").references(() => users.id),
-  requesterId: varchar("requester_id").references(() => users.id),
-  dueDate: timestamp("due_date"),
-  completedDate: timestamp("completed_date"),
-  companyId: varchar("company_id").references(() => companies.id),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
+  type: text("type").notNull(),
+  priority: text("priority").default("medium"),
+  status: text("status").default("pending"),
+  assignedTo: text("assigned_to").references(() => users.id),
+  requesterId: text("requester_id").references(() => users.id),
+  dueDate: integer("due_date", { mode: "timestamp" }),
+  completedDate: integer("completed_date", { mode: "timestamp" }),
+  companyId: text("company_id").references(() => companies.id),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
 });
 
 // Project Management
-export const projects = pgTable("projects", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+export const projects = sqliteTable("projects", {
+  id: text("id").primaryKey().$default(() => generateUUID()),
   name: text("name").notNull(),
   description: text("description"),
-  partnerId: varchar("partner_id").references(() => partners.id),
-  managerId: varchar("manager_id").references(() => users.id),
-  startDate: timestamp("start_date"),
-  endDate: timestamp("end_date"),
+  partnerId: text("partner_id").references(() => partners.id),
+  managerId: text("manager_id").references(() => users.id),
+  startDate: integer("start_date", { mode: "timestamp" }),
+  endDate: integer("end_date", { mode: "timestamp" }),
   state: text("state").default("active"),
-  companyId: varchar("company_id").references(() => companies.id),
-  createdAt: timestamp("created_at").defaultNow(),
+  companyId: text("company_id").references(() => companies.id),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
 });
 
-export const tasks = pgTable("tasks", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+export const tasks = sqliteTable("tasks", {
+  id: text("id").primaryKey().$default(() => generateUUID()),
   name: text("name").notNull(),
   description: text("description"),
-  projectId: varchar("project_id").references(() => projects.id),
-  assignedTo: varchar("assigned_to").references(() => users.id),
+  projectId: text("project_id").references(() => projects.id),
+  assignedTo: text("assigned_to").references(() => users.id),
   stage: text("stage").default("todo"),
   priority: text("priority").default("normal"),
-  dueDate: timestamp("due_date"),
-  companyId: varchar("company_id").references(() => companies.id),
-  createdAt: timestamp("created_at").defaultNow(),
+  dueDate: integer("due_date", { mode: "timestamp" }),
+  companyId: text("company_id").references(() => companies.id),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
 });
 
 // HR Module
-export const employees = pgTable("employees", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").references(() => users.id),
+export const employees = sqliteTable("employees", {
+  id: text("id").primaryKey().$default(() => generateUUID()),
+  userId: text("user_id").references(() => users.id),
   employeeId: text("employee_id").unique(),
   name: text("name").notNull(),
   jobTitle: text("job_title"),
   department: text("department"),
-  managerId: varchar("manager_id"),
-  hireDate: timestamp("hire_date"),
-  salary: decimal("salary", { precision: 15, scale: 2 }),
-  currency: varchar("currency", { length: 3 }).default("USD"),
-  companyId: varchar("company_id").references(() => companies.id),
-  createdAt: timestamp("created_at").defaultNow(),
+  managerId: text("manager_id"),
+  hireDate: integer("hire_date", { mode: "timestamp" }),
+  salary: text("salary"),
+  currency: text("currency", { length: 3 }).default("USD"),
+  companyId: text("company_id").references(() => companies.id),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
 });
 
 // Accounting Module
-export const accounts = pgTable("accounts", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+export const accounts = sqliteTable("accounts", {
+  id: text("id").primaryKey().$default(() => generateUUID()),
   code: text("code").notNull(),
   name: text("name").notNull(),
-  type: text("type").notNull(), // asset, liability, equity, income, expense
-  parentId: varchar("parent_id"),
-  companyId: varchar("company_id").references(() => companies.id),
-  createdAt: timestamp("created_at").defaultNow(),
+  type: text("type").notNull(),
+  parentId: text("parent_id"),
+  companyId: text("company_id").references(() => companies.id),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
 });
 
-export const journalEntries = pgTable("journal_entries", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+export const journalEntries = sqliteTable("journal_entries", {
+  id: text("id").primaryKey().$default(() => generateUUID()),
   name: text("name").notNull(),
-  date: timestamp("date").defaultNow(),
+  date: integer("date", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
   reference: text("reference"),
   state: text("state").default("draft"),
-  companyId: varchar("company_id").references(() => companies.id),
-  createdAt: timestamp("created_at").defaultNow(),
+  companyId: text("company_id").references(() => companies.id),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
 });
 
 // Activities and Calendar
-export const activities = pgTable("activities", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  type: text("type").notNull(), // meeting, call, email, task
+export const activities = sqliteTable("activities", {
+  id: text("id").primaryKey().$default(() => generateUUID()),
+  type: text("type").notNull(),
   summary: text("summary").notNull(),
   description: text("description"),
-  startDate: timestamp("start_date"),
-  endDate: timestamp("end_date"),
-  assignedTo: varchar("assigned_to").references(() => users.id),
-  relatedRecord: text("related_record"), // JSON reference to related record
-  companyId: varchar("company_id").references(() => companies.id),
-  createdAt: timestamp("created_at").defaultNow(),
+  startDate: integer("start_date", { mode: "timestamp" }),
+  endDate: integer("end_date", { mode: "timestamp" }),
+  assignedTo: text("assigned_to").references(() => users.id),
+  relatedRecord: text("related_record"),
+  companyId: text("company_id").references(() => companies.id),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
 });
 
 // Insert Schemas
-export const insertCompanySchema = createInsertSchema(companies).omit({ id: true, createdAt: true });
-export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
-export const insertLeadSchema = createInsertSchema(leads).omit({ id: true, createdAt: true, updatedAt: true });
-export const insertOpportunitySchema = createInsertSchema(opportunities).omit({ id: true, createdAt: true, updatedAt: true });
-export const insertPartnerSchema = createInsertSchema(partners).omit({ id: true, createdAt: true });
-export const insertProductSchema = createInsertSchema(products).omit({ id: true, createdAt: true });
-export const insertSalesOrderSchema = createInsertSchema(salesOrders).omit({ id: true, createdAt: true, updatedAt: true });
-export const insertProjectSchema = createInsertSchema(projects).omit({ id: true, createdAt: true });
-export const insertTaskSchema = createInsertSchema(tasks).omit({ id: true, createdAt: true });
-export const insertEmployeeSchema = createInsertSchema(employees).omit({ id: true, createdAt: true });
-export const insertAccountSchema = createInsertSchema(accounts).omit({ id: true, createdAt: true });
-export const insertActivitySchema = createInsertSchema(activities).omit({ id: true, createdAt: true });
-export const insertJournalEntrySchema = createInsertSchema(journalEntries).omit({ id: true, createdAt: true });
-export const insertPurchaseOrderSchema = createInsertSchema(purchaseOrders).omit({ id: true, createdAt: true });
-export const insertEventSchema = createInsertSchema(events).omit({ id: true, createdAt: true });
-export const insertEventRegistrationSchema = createInsertSchema(eventRegistrations).omit({ id: true });
-export const insertDocumentSchema = createInsertSchema(documents).omit({ id: true, createdAt: true, updatedAt: true });
-export const insertDocumentFolderSchema = createInsertSchema(documentFolders).omit({ id: true, createdAt: true });
-export const insertVehicleSchema = createInsertSchema(vehicles).omit({ id: true, createdAt: true });
-export const insertVehicleMaintenanceSchema = createInsertSchema(vehicleMaintenance).omit({ id: true, createdAt: true });
-export const insertApprovalRequestSchema = createInsertSchema(approvalRequests).omit({ id: true, createdAt: true, updatedAt: true });
-export const insertApprovalWorkflowSchema = createInsertSchema(approvalWorkflows).omit({ id: true });
-export const insertEquipmentSchema = createInsertSchema(equipment).omit({ id: true, createdAt: true });
-export const insertMaintenanceRequestSchema = createInsertSchema(maintenanceRequests).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertCompanySchema = createInsertSchema(companies);
+export const insertUserSchema = createInsertSchema(users);
+export const insertLeadSchema = createInsertSchema(leads);
+export const insertOpportunitySchema = createInsertSchema(opportunities);
+export const insertPartnerSchema = createInsertSchema(partners);
+export const insertProductSchema = createInsertSchema(products);
+export const insertSalesOrderSchema = createInsertSchema(salesOrders);
+export const insertProjectSchema = createInsertSchema(projects);
+export const insertTaskSchema = createInsertSchema(tasks);
+export const insertEmployeeSchema = createInsertSchema(employees);
+export const insertActivitySchema = createInsertSchema(activities);
+export const insertPurchaseOrderSchema = createInsertSchema(purchaseOrders);
+export const insertEventSchema = createInsertSchema(events);
+export const insertEventRegistrationSchema = createInsertSchema(eventRegistrations);
+export const insertDocumentSchema = createInsertSchema(documents);
+export const insertDocumentFolderSchema = createInsertSchema(documentFolders);
+export const insertVehicleSchema = createInsertSchema(vehicles);
+export const insertVehicleMaintenanceSchema = createInsertSchema(vehicleMaintenance);
+export const insertApprovalRequestSchema = createInsertSchema(approvalRequests);
+export const insertApprovalWorkflowSchema = createInsertSchema(approvalWorkflows);
+export const insertEquipmentSchema = createInsertSchema(equipment);
+export const insertMaintenanceRequestSchema = createInsertSchema(maintenanceRequests);
+export const insertAccountSchema = createInsertSchema(accounts);
+export const insertJournalEntrySchema = createInsertSchema(journalEntries);
 
-// Types
+// Type exports
 export type Company = typeof companies.$inferSelect;
-export type User = typeof users.$inferSelect;
-export type Lead = typeof leads.$inferSelect;
-export type Opportunity = typeof opportunities.$inferSelect;
-export type Partner = typeof partners.$inferSelect;
-export type Product = typeof products.$inferSelect;
-export type SalesOrder = typeof salesOrders.$inferSelect;
-export type Project = typeof projects.$inferSelect;
-export type Task = typeof tasks.$inferSelect;
-export type Employee = typeof employees.$inferSelect;
-export type Activity = typeof activities.$inferSelect;
-export type Account = typeof accounts.$inferSelect;
-export type JournalEntry = typeof journalEntries.$inferSelect;
-export type PurchaseOrder = typeof purchaseOrders.$inferSelect;
-export type Event = typeof events.$inferSelect;
-export type EventRegistration = typeof eventRegistrations.$inferSelect;
-export type Document = typeof documents.$inferSelect;
-export type DocumentFolder = typeof documentFolders.$inferSelect;
-export type Vehicle = typeof vehicles.$inferSelect;
-export type VehicleMaintenance = typeof vehicleMaintenance.$inferSelect;
-export type ApprovalRequest = typeof approvalRequests.$inferSelect;
-export type ApprovalWorkflow = typeof approvalWorkflows.$inferSelect;
-export type Equipment = typeof equipment.$inferSelect;
-export type MaintenanceRequest = typeof maintenanceRequests.$inferSelect;
-
 export type InsertCompany = z.infer<typeof insertCompanySchema>;
+export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
+export type Lead = typeof leads.$inferSelect;
 export type InsertLead = z.infer<typeof insertLeadSchema>;
+export type Opportunity = typeof opportunities.$inferSelect;
 export type InsertOpportunity = z.infer<typeof insertOpportunitySchema>;
+export type Partner = typeof partners.$inferSelect;
 export type InsertPartner = z.infer<typeof insertPartnerSchema>;
+export type Product = typeof products.$inferSelect;
 export type InsertProduct = z.infer<typeof insertProductSchema>;
+export type SalesOrder = typeof salesOrders.$inferSelect;
 export type InsertSalesOrder = z.infer<typeof insertSalesOrderSchema>;
+export type Project = typeof projects.$inferSelect;
 export type InsertProject = z.infer<typeof insertProjectSchema>;
+export type Task = typeof tasks.$inferSelect;
 export type InsertTask = z.infer<typeof insertTaskSchema>;
+export type Employee = typeof employees.$inferSelect;
 export type InsertEmployee = z.infer<typeof insertEmployeeSchema>;
+export type Activity = typeof activities.$inferSelect;
 export type InsertActivity = z.infer<typeof insertActivitySchema>;
-export type InsertAccount = z.infer<typeof insertAccountSchema>;
-export type InsertJournalEntry = z.infer<typeof insertJournalEntrySchema>;
+export type PurchaseOrder = typeof purchaseOrders.$inferSelect;
 export type InsertPurchaseOrder = z.infer<typeof insertPurchaseOrderSchema>;
+export type Event = typeof events.$inferSelect;
 export type InsertEvent = z.infer<typeof insertEventSchema>;
+export type EventRegistration = typeof eventRegistrations.$inferSelect;
 export type InsertEventRegistration = z.infer<typeof insertEventRegistrationSchema>;
+export type Document = typeof documents.$inferSelect;
 export type InsertDocument = z.infer<typeof insertDocumentSchema>;
+export type DocumentFolder = typeof documentFolders.$inferSelect;
 export type InsertDocumentFolder = z.infer<typeof insertDocumentFolderSchema>;
+export type Vehicle = typeof vehicles.$inferSelect;
 export type InsertVehicle = z.infer<typeof insertVehicleSchema>;
+export type VehicleMaintenance = typeof vehicleMaintenance.$inferSelect;
 export type InsertVehicleMaintenance = z.infer<typeof insertVehicleMaintenanceSchema>;
+export type ApprovalRequest = typeof approvalRequests.$inferSelect;
 export type InsertApprovalRequest = z.infer<typeof insertApprovalRequestSchema>;
+export type ApprovalWorkflow = typeof approvalWorkflows.$inferSelect;
 export type InsertApprovalWorkflow = z.infer<typeof insertApprovalWorkflowSchema>;
+export type Equipment = typeof equipment.$inferSelect;
 export type InsertEquipment = z.infer<typeof insertEquipmentSchema>;
+export type MaintenanceRequest = typeof maintenanceRequests.$inferSelect;
 export type InsertMaintenanceRequest = z.infer<typeof insertMaintenanceRequestSchema>;
+export type Account = typeof accounts.$inferSelect;
+export type InsertAccount = z.infer<typeof insertAccountSchema>;
+export type JournalEntry = typeof journalEntries.$inferSelect;
+export type InsertJournalEntry = z.infer<typeof insertJournalEntrySchema>;

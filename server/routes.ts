@@ -8,11 +8,280 @@ import {
   insertPurchaseOrderSchema, insertEventSchema, insertEventRegistrationSchema,
   insertDocumentSchema, insertDocumentFolderSchema, insertVehicleSchema,
   insertVehicleMaintenanceSchema, insertApprovalRequestSchema, insertApprovalWorkflowSchema,
-  insertEquipmentSchema, insertMaintenanceRequestSchema
+  insertEquipmentSchema, insertMaintenanceRequestSchema, insertUserSchema, insertCompanySchema
 } from "@shared/schema";
+import bcrypt from "bcryptjs";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const currentCompanyId = "default-company"; // In real app, this would come from session
+
+  // Authentication endpoints
+  app.post("/api/auth/login", async (req, res) => {
+    try {
+      const { username, password } = req.body;
+      
+      if (!username || !password) {
+        return res.status(400).json({ error: "Username and password are required" });
+      }
+
+      const user = await storage.getUserByUsername(username);
+      
+      if (!user || !(await storage.validatePassword(password, user.password))) {
+        return res.status(401).json({ error: "Invalid credentials" });
+      }
+
+      if (!user.isActive) {
+        return res.status(401).json({ error: "Account is disabled" });
+      }
+
+      // Remove password from response
+      const { password: _, ...userWithoutPassword } = user;
+      
+      res.json({
+        user: userWithoutPassword,
+        message: "Login successful"
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Login failed" });
+    }
+  });
+
+  app.post("/api/auth/register", async (req, res) => {
+    try {
+      const validatedData = insertUserSchema.parse(req.body);
+      
+      // Check if user already exists
+      const existingUser = await storage.getUserByUsername(validatedData.username);
+      if (existingUser) {
+        return res.status(400).json({ error: "Username already exists" });
+      }
+
+      const existingEmail = await storage.getUserByEmail(validatedData.email);
+      if (existingEmail) {
+        return res.status(400).json({ error: "Email already exists" });
+      }
+
+      const user = await storage.createUser(validatedData);
+      
+      // Remove password from response
+      const { password: _, ...userWithoutPassword } = user;
+      
+      res.status(201).json({
+        user: userWithoutPassword,
+        message: "Registration successful"
+      });
+    } catch (error) {
+      res.status(400).json({ error: "Invalid user data" });
+    }
+  });
+
+  app.get("/api/auth/me", async (req, res) => {
+    try {
+      // In a real app, this would get user from session/token
+      const user = await storage.getUserByUsername("admin");
+      if (!user) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      
+      const { password: _, ...userWithoutPassword } = user;
+      res.json(userWithoutPassword);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get user" });
+    }
+  });
+
+  // Companies endpoints
+  app.get("/api/companies", async (req, res) => {
+    try {
+      const companies = await storage.getCompanies();
+      res.json(companies);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch companies" });
+    }
+  });
+
+  app.post("/api/companies", async (req, res) => {
+    try {
+      const validatedData = insertCompanySchema.parse(req.body);
+      const company = await storage.createCompany(validatedData);
+      res.status(201).json(company);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid company data" });
+    }
+  });
+
+  // Users endpoints
+  app.get("/api/users", async (req, res) => {
+    try {
+      const users = await storage.getUsers(currentCompanyId);
+      res.json(users);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch users" });
+    }
+  });
+
+  app.post("/api/users", async (req, res) => {
+    try {
+      const validatedData = insertUserSchema.parse(req.body);
+      const user = await storage.createUser(validatedData);
+      res.status(201).json(user);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid user data" });
+    }
+  });
+
+  app.patch("/api/users/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const validatedData = insertUserSchema.partial().parse(req.body);
+      const user = await storage.updateUser(id, validatedData);
+      res.json(user);
+    } catch (error) {
+      res.status(400).json({ error: "Failed to update user" });
+    }
+  });
+
+  app.delete("/api/users/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteUser(id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(400).json({ error: "Failed to delete user" });
+    }
+  });
+
+  // Leads endpoints
+  app.get("/api/leads", async (req, res) => {
+    try {
+      const leads = await storage.getLeads(currentCompanyId);
+      res.json(leads);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch leads" });
+    }
+  });
+
+  app.post("/api/leads", async (req, res) => {
+    try {
+      const validatedData = insertLeadSchema.parse(req.body);
+      const lead = await storage.createLead({
+        ...validatedData,
+        companyId: currentCompanyId
+      });
+      res.status(201).json(lead);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid lead data" });
+    }
+  });
+
+  app.patch("/api/leads/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const validatedData = insertLeadSchema.partial().parse(req.body);
+      const lead = await storage.updateLead(id, validatedData);
+      res.json(lead);
+    } catch (error) {
+      res.status(400).json({ error: "Failed to update lead" });
+    }
+  });
+
+  app.delete("/api/leads/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteLead(id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(400).json({ error: "Failed to delete lead" });
+    }
+  });
+
+  // Sales Orders endpoints
+  app.get("/api/sales-orders", async (req, res) => {
+    try {
+      const salesOrders = await storage.getSalesOrders(currentCompanyId);
+      res.json(salesOrders);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch sales orders" });
+    }
+  });
+
+  app.post("/api/sales-orders", async (req, res) => {
+    try {
+      const validatedData = insertSalesOrderSchema.parse(req.body);
+      const salesOrder = await storage.createSalesOrder({
+        ...validatedData,
+        companyId: currentCompanyId
+      });
+      res.status(201).json(salesOrder);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid sales order data" });
+    }
+  });
+
+  app.patch("/api/sales-orders/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const validatedData = insertSalesOrderSchema.partial().parse(req.body);
+      const salesOrder = await storage.updateSalesOrder(id, validatedData);
+      res.json(salesOrder);
+    } catch (error) {
+      res.status(400).json({ error: "Failed to update sales order" });
+    }
+  });
+
+  app.delete("/api/sales-orders/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteSalesOrder(id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(400).json({ error: "Failed to delete sales order" });
+    }
+  });
+
+  // Employees endpoints
+  app.get("/api/employees", async (req, res) => {
+    try {
+      const employees = await storage.getEmployees(currentCompanyId);
+      res.json(employees);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch employees" });
+    }
+  });
+
+  app.post("/api/employees", async (req, res) => {
+    try {
+      const validatedData = insertEmployeeSchema.parse(req.body);
+      const employee = await storage.createEmployee({
+        ...validatedData,
+        companyId: currentCompanyId
+      });
+      res.status(201).json(employee);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid employee data" });
+    }
+  });
+
+  app.patch("/api/employees/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const validatedData = insertEmployeeSchema.partial().parse(req.body);
+      const employee = await storage.updateEmployee(id, validatedData);
+      res.json(employee);
+    } catch (error) {
+      res.status(400).json({ error: "Failed to update employee" });
+    }
+  });
+
+  app.delete("/api/employees/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteEmployee(id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(400).json({ error: "Failed to delete employee" });
+    }
+  });
 
   // Dashboard endpoints
   app.get("/api/dashboard/kpis", async (req, res) => {
