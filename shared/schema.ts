@@ -1,455 +1,476 @@
-import { sql } from "drizzle-orm";
-import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
-import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+import { createInsertSchema, createSelectSchema } from "drizzle-zod";
+import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
 
-// Helper function to generate UUID
-function generateUUID() {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-    const r = Math.random() * 16 | 0;
-    const v = c === 'x' ? r : (r & 0x3 | 0x8);
-    return v.toString(16);
-  });
-}
-
-// Core Company and User Management
+// Companies table
 export const companies = sqliteTable("companies", {
-  id: text("id").primaryKey().$default(() => generateUUID()),
+  id: text("id").primaryKey(),
   name: text("name").notNull(),
-  currency: text("currency", { length: 3 }).default("USD"),
-  country: text("country"),
+  currency: text("currency").default("USD"),
   timezone: text("timezone").default("UTC"),
-  settings: text("settings").default("{}"),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
+  country: text("country"),
+  settings: text("settings", { mode: "json" }).default("{}"),
+  createdAt: text("created_at").default(new Date().toISOString()),
+  updatedAt: text("updated_at").default(new Date().toISOString()),
 });
 
+// Users table
 export const users = sqliteTable("users", {
-  id: text("id").primaryKey().$default(() => generateUUID()),
+  id: text("id").primaryKey(),
   username: text("username").notNull().unique(),
   email: text("email").notNull().unique(),
-  password: text("password").notNull(),
   name: text("name").notNull(),
+  password: text("password").notNull(),
   companyId: text("company_id").references(() => companies.id),
-  isActive: integer("is_active", { mode: "boolean" }).default(true),
-  roles: text("roles").default("[]"),
-  settings: text("settings").default("{}"),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
+  isActive: integer("is_active").default(1),
+  roles: text("roles", { mode: "json" }).default("[]"),
+  settings: text("settings", { mode: "json" }).default("{}"),
+  createdAt: text("created_at").default(new Date().toISOString()),
+  updatedAt: text("updated_at").default(new Date().toISOString()),
 });
 
-// CRM Module
+// CRM - Leads table
 export const leads = sqliteTable("leads", {
-  id: text("id").primaryKey().$default(() => generateUUID()),
+  id: text("id").primaryKey(),
   name: text("name").notNull(),
   email: text("email"),
   phone: text("phone"),
   company: text("company"),
   source: text("source"),
+  description: text("description"),
   stage: text("stage").default("new"),
   probability: integer("probability").default(0),
-  expectedRevenue: text("expected_revenue"),
-  description: text("description"),
+  expectedRevenue: real("expected_revenue"),
   assignedTo: text("assigned_to").references(() => users.id),
   companyId: text("company_id").references(() => companies.id),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
+  createdAt: text("created_at").default(new Date().toISOString()),
+  updatedAt: text("updated_at").default(new Date().toISOString()),
 });
 
+// CRM - Opportunities table
 export const opportunities = sqliteTable("opportunities", {
-  id: text("id").primaryKey().$default(() => generateUUID()),
+  id: text("id").primaryKey(),
   name: text("name").notNull(),
   partnerId: text("partner_id").references(() => partners.id),
+  description: text("description"),
   stage: text("stage").default("new"),
   probability: integer("probability").default(0),
-  expectedRevenue: text("expected_revenue"),
-  closeDate: integer("close_date", { mode: "timestamp" }),
+  expectedRevenue: real("expected_revenue"),
+  closeDate: text("close_date"),
   assignedTo: text("assigned_to").references(() => users.id),
   companyId: text("company_id").references(() => companies.id),
-  description: text("description"),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
+  createdAt: text("created_at").default(new Date().toISOString()),
+  updatedAt: text("updated_at").default(new Date().toISOString()),
 });
 
-// Partners (Customers/Vendors)
+// Partners table
 export const partners = sqliteTable("partners", {
-  id: text("id").primaryKey().$default(() => generateUUID()),
+  id: text("id").primaryKey(),
   name: text("name").notNull(),
+  type: text("type").notNull(), // customer, supplier, both
   email: text("email"),
   phone: text("phone"),
-  website: text("website"),
-  isCustomer: integer("is_customer", { mode: "boolean" }).default(true),
-  isVendor: integer("is_vendor", { mode: "boolean" }).default(false),
-  street: text("street"),
+  address: text("address"),
   city: text("city"),
   state: text("state"),
-  zip: text("zip"),
   country: text("country"),
-  vatNumber: text("vat_number"),
+  isCustomer: integer("is_customer").default(0),
+  isSupplier: integer("is_supplier").default(0),
+  taxId: text("tax_id"),
+  website: text("website"),
+  notes: text("notes"),
   companyId: text("company_id").references(() => companies.id),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
+  createdAt: text("created_at").default(new Date().toISOString()),
+  updatedAt: text("updated_at").default(new Date().toISOString()),
 });
 
-// Products and Inventory
+// Products table
 export const products = sqliteTable("products", {
-  id: text("id").primaryKey().$default(() => generateUUID()),
+  id: text("id").primaryKey(),
   name: text("name").notNull(),
-  internalReference: text("internal_reference"),
-  barcode: text("barcode"),
-  salePrice: text("sale_price"),
-  cost: text("cost"),
+  sku: text("sku").unique(),
+  description: text("description"),
   category: text("category"),
-  type: text("type").default("storable"),
-  description: text("description"),
-  active: integer("active", { mode: "boolean" }).default(true),
+  price: real("price").default(0),
+  cost: real("cost").default(0),
+  quantity: integer("quantity").default(0),
+  unit: text("unit").default("pcs"),
+  isActive: integer("is_active").default(1),
   companyId: text("company_id").references(() => companies.id),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
+  createdAt: text("created_at").default(new Date().toISOString()),
+  updatedAt: text("updated_at").default(new Date().toISOString()),
 });
 
+// Inventory table
 export const inventory = sqliteTable("inventory", {
-  id: text("id").primaryKey().$default(() => generateUUID()),
+  id: text("id").primaryKey(),
   productId: text("product_id").references(() => products.id),
-  location: text("location").default("WH/Stock"),
-  quantityOnHand: text("quantity_on_hand").default("0"),
-  quantityReserved: text("quantity_reserved").default("0"),
-  quantityAvailable: text("quantity_available").default("0"),
+  quantity: integer("quantity").notNull(),
+  location: text("location"),
+  batchNumber: text("batch_number"),
+  expiryDate: text("expiry_date"),
   companyId: text("company_id").references(() => companies.id),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
+  createdAt: text("created_at").default(new Date().toISOString()),
+  updatedAt: text("updated_at").default(new Date().toISOString()),
 });
 
-// Sales Module
+// Sales Orders table
 export const salesOrders = sqliteTable("sales_orders", {
-  id: text("id").primaryKey().$default(() => generateUUID()),
-  name: text("name").notNull(),
-  partnerId: text("partner_id").references(() => partners.id),
-  state: text("state").default("draft"),
-  totalAmount: text("total_amount").default("0"),
-  currency: text("currency", { length: 3 }).default("USD"),
-  orderDate: integer("order_date", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
-  deliveryDate: integer("delivery_date", { mode: "timestamp" }),
-  salespersonId: text("salesperson_id").references(() => users.id),
+  id: text("id").primaryKey(),
+  orderNumber: text("order_number").notNull().unique(),
+  customerId: text("customer_id").references(() => partners.id),
+  orderDate: text("order_date").notNull(),
+  expectedDeliveryDate: text("expected_delivery_date"),
+  status: text("status").default("draft"),
+  subtotal: real("subtotal").default(0),
+  tax: real("tax").default(0),
+  total: real("total").default(0),
+  notes: text("notes"),
   companyId: text("company_id").references(() => companies.id),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
+  createdAt: text("created_at").default(new Date().toISOString()),
+  updatedAt: text("updated_at").default(new Date().toISOString()),
 });
 
-export const salesOrderLines = sqliteTable("sales_order_lines", {
-  id: text("id").primaryKey().$default(() => generateUUID()),
-  orderId: text("order_id").references(() => salesOrders.id),
-  productId: text("product_id").references(() => products.id),
-  quantity: text("quantity").notNull(),
-  unitPrice: text("unit_price").notNull(),
-  discount: text("discount").default("0"),
-  subtotal: text("subtotal").notNull(),
-});
-
-// Purchase Module
-export const purchaseOrders = sqliteTable("purchase_orders", {
-  id: text("id").primaryKey().$default(() => generateUUID()),
-  name: text("name").notNull(),
-  vendorId: text("vendor_id").references(() => partners.id),
-  state: text("state").default("draft"),
-  totalAmount: text("total_amount").default("0"),
-  currency: text("currency", { length: 3 }).default("USD"),
-  orderDate: integer("order_date", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
-  receiptDate: integer("receipt_date", { mode: "timestamp" }),
-  companyId: text("company_id").references(() => companies.id),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
-});
-
-// Events Module
-export const events = sqliteTable("events", {
-  id: text("id").primaryKey().$default(() => generateUUID()),
+// Projects table
+export const projects = sqliteTable("projects", {
+  id: text("id").primaryKey(),
   name: text("name").notNull(),
   description: text("description"),
-  startDate: integer("start_date", { mode: "timestamp" }),
-  endDate: integer("end_date", { mode: "timestamp" }),
-  venue: text("venue"),
-  capacity: integer("capacity"),
-  registrationDeadline: integer("registration_deadline", { mode: "timestamp" }),
+  status: text("status").default("planning"),
+  startDate: text("start_date"),
+  endDate: text("end_date"),
+  budget: real("budget"),
+  managerId: text("manager_id").references(() => users.id),
+  customerId: text("customer_id").references(() => partners.id),
+  companyId: text("company_id").references(() => companies.id),
+  createdAt: text("created_at").default(new Date().toISOString()),
+  updatedAt: text("updated_at").default(new Date().toISOString()),
+});
+
+// Tasks table
+export const tasks = sqliteTable("tasks", {
+  id: text("id").primaryKey(),
+  title: text("title").notNull(),
+  description: text("description"),
+  status: text("status").default("todo"),
+  priority: text("priority").default("medium"),
+  dueDate: text("due_date"),
+  assigneeId: text("assignee_id").references(() => users.id),
+  projectId: text("project_id").references(() => projects.id),
+  companyId: text("company_id").references(() => companies.id),
+  createdAt: text("created_at").default(new Date().toISOString()),
+  updatedAt: text("updated_at").default(new Date().toISOString()),
+});
+
+// Employees table
+export const employees = sqliteTable("employees", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").references(() => users.id),
+  employeeId: text("employee_id").unique(),
+  department: text("department"),
+  position: text("position"),
+  hireDate: text("hire_date"),
+  salary: real("salary"),
+  managerId: text("manager_id").references(() => employees.id),
+  companyId: text("company_id").references(() => companies.id),
+  createdAt: text("created_at").default(new Date().toISOString()),
+  updatedAt: text("updated_at").default(new Date().toISOString()),
+});
+
+// Activities table
+export const activities = sqliteTable("activities", {
+  id: text("id").primaryKey(),
+  type: text("type").notNull(), // call, email, meeting, task
+  title: text("title").notNull(),
+  description: text("description"),
+  dueDate: text("due_date"),
+  completed: integer("completed").default(0),
+  assignedTo: text("assigned_to").references(() => users.id),
+  companyId: text("company_id").references(() => companies.id),
+  createdAt: text("created_at").default(new Date().toISOString()),
+  updatedAt: text("updated_at").default(new Date().toISOString()),
+});
+
+// Purchase Orders table
+export const purchaseOrders = sqliteTable("purchase_orders", {
+  id: text("id").primaryKey(),
+  orderNumber: text("order_number").notNull().unique(),
+  supplierId: text("supplier_id").references(() => partners.id),
+  orderDate: text("order_date").notNull(),
+  expectedDeliveryDate: text("expected_delivery_date"),
   status: text("status").default("draft"),
-  organizerId: text("organizer_id").references(() => users.id),
+  subtotal: real("subtotal").default(0),
+  tax: real("tax").default(0),
+  total: real("total").default(0),
+  notes: text("notes"),
   companyId: text("company_id").references(() => companies.id),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
+  createdAt: text("created_at").default(new Date().toISOString()),
+  updatedAt: text("updated_at").default(new Date().toISOString()),
 });
 
+// Events table
+export const events = sqliteTable("events", {
+  id: text("id").primaryKey(),
+  title: text("title").notNull(),
+  description: text("description"),
+  startDate: text("start_date").notNull(),
+  endDate: text("end_date").notNull(),
+  location: text("location"),
+  maxAttendees: integer("max_attendees"),
+  isActive: integer("is_active").default(1),
+  companyId: text("company_id").references(() => companies.id),
+  createdAt: text("created_at").default(new Date().toISOString()),
+  updatedAt: text("updated_at").default(new Date().toISOString()),
+});
+
+// Event Registrations table
 export const eventRegistrations = sqliteTable("event_registrations", {
-  id: text("id").primaryKey().$default(() => generateUUID()),
+  id: text("id").primaryKey(),
   eventId: text("event_id").references(() => events.id),
-  attendeeName: text("attendee_name").notNull(),
-  attendeeEmail: text("attendee_email").notNull(),
-  registrationDate: integer("registration_date", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
-  status: text("status").default("confirmed"),
-  companyId: text("company_id").references(() => companies.id),
+  userId: text("user_id").references(() => users.id),
+  status: text("status").default("registered"),
+  registeredAt: text("registered_at").default(new Date().toISOString()),
+  createdAt: text("created_at").default(new Date().toISOString()),
 });
 
-// Documents Module
+// Documents table
 export const documents = sqliteTable("documents", {
-  id: text("id").primaryKey().$default(() => generateUUID()),
+  id: text("id").primaryKey(),
   name: text("name").notNull(),
-  fileName: text("file_name").notNull(),
-  fileSize: integer("file_size"),
-  mimeType: text("mime_type"),
-  folderId: text("folder_id"),
-  ownerId: text("owner_id").references(() => users.id),
-  tags: text("tags").default("[]"),
-  isShared: integer("is_shared", { mode: "boolean" }).default(false),
+  type: text("type").notNull(),
+  size: integer("size"),
+  path: text("path"),
+  folderId: text("folder_id").references(() => documentFolders.id),
+  uploadedBy: text("uploaded_by").references(() => users.id),
   companyId: text("company_id").references(() => companies.id),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
+  createdAt: text("created_at").default(new Date().toISOString()),
+  updatedAt: text("updated_at").default(new Date().toISOString()),
 });
 
+// Document Folders table
 export const documentFolders = sqliteTable("document_folders", {
-  id: text("id").primaryKey().$default(() => generateUUID()),
+  id: text("id").primaryKey(),
   name: text("name").notNull(),
-  parentId: text("parent_id"),
-  ownerId: text("owner_id").references(() => users.id),
+  parentId: text("parent_id").references(() => documentFolders.id),
   companyId: text("company_id").references(() => companies.id),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
+  createdAt: text("created_at").default(new Date().toISOString()),
+  updatedAt: text("updated_at").default(new Date().toISOString()),
 });
 
-// Fleet Module
+// Vehicles table
 export const vehicles = sqliteTable("vehicles", {
-  id: text("id").primaryKey().$default(() => generateUUID()),
+  id: text("id").primaryKey(),
+  make: text("make").notNull(),
   model: text("model").notNull(),
   year: integer("year"),
-  licensePlate: text("license_plate"),
-  vin: text("vin"),
-  driverId: text("driver_id").references(() => users.id),
+  licensePlate: text("license_plate").unique(),
+  vin: text("vin").unique(),
+  type: text("type"),
   status: text("status").default("active"),
-  mileage: integer("mileage").default(0),
-  location: text("location"),
-  nextServiceDate: integer("next_service_date", { mode: "timestamp" }),
   companyId: text("company_id").references(() => companies.id),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
+  createdAt: text("created_at").default(new Date().toISOString()),
+  updatedAt: text("updated_at").default(new Date().toISOString()),
 });
 
+// Vehicle Maintenance table
 export const vehicleMaintenance = sqliteTable("vehicle_maintenance", {
-  id: text("id").primaryKey().$default(() => generateUUID()),
+  id: text("id").primaryKey(),
   vehicleId: text("vehicle_id").references(() => vehicles.id),
   type: text("type").notNull(),
   description: text("description"),
-  cost: text("cost"),
-  serviceDate: integer("service_date", { mode: "timestamp" }),
-  nextServiceDate: integer("next_service_date", { mode: "timestamp" }),
-  mechanicId: text("mechanic_id").references(() => users.id),
+  date: text("date").notNull(),
+  cost: real("cost"),
+  mileage: integer("mileage"),
   status: text("status").default("scheduled"),
   companyId: text("company_id").references(() => companies.id),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
+  createdAt: text("created_at").default(new Date().toISOString()),
+  updatedAt: text("updated_at").default(new Date().toISOString()),
 });
 
-// Approvals Module
+// Approval Requests table
 export const approvalRequests = sqliteTable("approval_requests", {
-  id: text("id").primaryKey().$default(() => generateUUID()),
+  id: text("id").primaryKey(),
   title: text("title").notNull(),
   description: text("description"),
   type: text("type").notNull(),
-  amount: text("amount"),
-  requesterId: text("requester_id").references(() => users.id),
   status: text("status").default("pending"),
-  priority: text("priority").default("medium"),
+  requestedBy: text("requested_by").references(() => users.id),
   companyId: text("company_id").references(() => companies.id),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
+  createdAt: text("created_at").default(new Date().toISOString()),
+  updatedAt: text("updated_at").default(new Date().toISOString()),
 });
 
+// Approval Workflows table
 export const approvalWorkflows = sqliteTable("approval_workflows", {
-  id: text("id").primaryKey().$default(() => generateUUID()),
+  id: text("id").primaryKey(),
   requestId: text("request_id").references(() => approvalRequests.id),
   approverId: text("approver_id").references(() => users.id),
-  order: integer("order").notNull(),
   status: text("status").default("pending"),
   comments: text("comments"),
-  actionDate: integer("action_date", { mode: "timestamp" }),
-  companyId: text("company_id").references(() => companies.id),
+  createdAt: text("created_at").default(new Date().toISOString()),
+  updatedAt: text("updated_at").default(new Date().toISOString()),
 });
 
-// Equipment Maintenance Module
+// Equipment table
 export const equipment = sqliteTable("equipment", {
-  id: text("id").primaryKey().$default(() => generateUUID()),
+  id: text("id").primaryKey(),
   name: text("name").notNull(),
-  serialNumber: text("serial_number"),
-  category: text("category"),
+  type: text("type").notNull(),
+  description: text("description"),
   location: text("location"),
-  status: text("status").default("operational"),
-  purchaseDate: integer("purchase_date", { mode: "timestamp" }),
-  warrantyExpiry: integer("warranty_expiry", { mode: "timestamp" }),
+  status: text("status").default("active"),
+  lastMaintenanceDate: text("last_maintenance_date"),
+  nextMaintenanceDate: text("next_maintenance_date"),
   companyId: text("company_id").references(() => companies.id),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
+  createdAt: text("created_at").default(new Date().toISOString()),
+  updatedAt: text("updated_at").default(new Date().toISOString()),
 });
 
+// Maintenance Requests table
 export const maintenanceRequests = sqliteTable("maintenance_requests", {
-  id: text("id").primaryKey().$default(() => generateUUID()),
+  id: text("id").primaryKey(),
   equipmentId: text("equipment_id").references(() => equipment.id),
   title: text("title").notNull(),
   description: text("description"),
-  type: text("type").notNull(),
   priority: text("priority").default("medium"),
-  status: text("status").default("pending"),
-  assignedTo: text("assigned_to").references(() => users.id),
-  requesterId: text("requester_id").references(() => users.id),
-  dueDate: integer("due_date", { mode: "timestamp" }),
-  completedDate: integer("completed_date", { mode: "timestamp" }),
+  status: text("status").default("open"),
+  requestedBy: text("requested_by").references(() => users.id),
   companyId: text("company_id").references(() => companies.id),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
+  createdAt: text("created_at").default(new Date().toISOString()),
+  updatedAt: text("updated_at").default(new Date().toISOString()),
 });
 
-// Project Management
-export const projects = sqliteTable("projects", {
-  id: text("id").primaryKey().$default(() => generateUUID()),
-  name: text("name").notNull(),
-  description: text("description"),
-  partnerId: text("partner_id").references(() => partners.id),
-  managerId: text("manager_id").references(() => users.id),
-  startDate: integer("start_date", { mode: "timestamp" }),
-  endDate: integer("end_date", { mode: "timestamp" }),
-  state: text("state").default("active"),
-  companyId: text("company_id").references(() => companies.id),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
-});
-
-export const tasks = sqliteTable("tasks", {
-  id: text("id").primaryKey().$default(() => generateUUID()),
-  name: text("name").notNull(),
-  description: text("description"),
-  projectId: text("project_id").references(() => projects.id),
-  assignedTo: text("assigned_to").references(() => users.id),
-  stage: text("stage").default("todo"),
-  priority: text("priority").default("normal"),
-  dueDate: integer("due_date", { mode: "timestamp" }),
-  companyId: text("company_id").references(() => companies.id),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
-});
-
-// HR Module
-export const employees = sqliteTable("employees", {
-  id: text("id").primaryKey().$default(() => generateUUID()),
-  userId: text("user_id").references(() => users.id),
-  employeeId: text("employee_id").unique(),
-  name: text("name").notNull(),
-  jobTitle: text("job_title"),
-  department: text("department"),
-  managerId: text("manager_id"),
-  hireDate: integer("hire_date", { mode: "timestamp" }),
-  salary: text("salary"),
-  currency: text("currency", { length: 3 }).default("USD"),
-  companyId: text("company_id").references(() => companies.id),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
-});
-
-// Accounting Module
-export const accounts = sqliteTable("accounts", {
-  id: text("id").primaryKey().$default(() => generateUUID()),
-  code: text("code").notNull(),
-  name: text("name").notNull(),
-  type: text("type").notNull(),
-  parentId: text("parent_id"),
-  companyId: text("company_id").references(() => companies.id),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
-});
-
-export const journalEntries = sqliteTable("journal_entries", {
-  id: text("id").primaryKey().$default(() => generateUUID()),
-  name: text("name").notNull(),
-  date: integer("date", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
-  reference: text("reference"),
-  state: text("state").default("draft"),
-  companyId: text("company_id").references(() => companies.id),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
-});
-
-// Manufacturing Module
+// Manufacturing - Production Orders table
 export const productionOrders = sqliteTable("production_orders", {
-  id: text("id").primaryKey().$default(() => generateUUID()),
-  name: text("name").notNull(),
+  id: text("id").primaryKey(),
+  orderNumber: text("order_number").notNull().unique(),
   productId: text("product_id").references(() => products.id),
-  quantity: text("quantity").notNull(),
-  unit: text("unit").default("pcs"),
-  state: text("state").default("draft"),
-  priority: text("priority").default("normal"),
-  plannedStartDate: integer("planned_start_date", { mode: "timestamp" }),
-  plannedEndDate: integer("planned_end_date", { mode: "timestamp" }),
-  actualStartDate: integer("actual_start_date", { mode: "timestamp" }),
-  actualEndDate: integer("actual_end_date", { mode: "timestamp" }),
-  managerId: text("manager_id").references(() => users.id),
+  quantity: integer("quantity").notNull(),
+  status: text("status").default("planned"),
+  startDate: text("start_date"),
+  endDate: text("end_date"),
+  priority: text("priority").default("medium"),
   companyId: text("company_id").references(() => companies.id),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
+  createdAt: text("created_at").default(new Date().toISOString()),
+  updatedAt: text("updated_at").default(new Date().toISOString()),
 });
 
+// Manufacturing - Work Orders table
 export const workOrders = sqliteTable("work_orders", {
-  id: text("id").primaryKey().$default(() => generateUUID()),
-  name: text("name").notNull(),
+  id: text("id").primaryKey(),
   productionOrderId: text("production_order_id").references(() => productionOrders.id),
-  workCenterId: text("work_center_id"),
-  operation: text("operation").notNull(),
-  quantity: text("quantity").notNull(),
-  unit: text("unit").default("pcs"),
-  state: text("state").default("pending"),
-  plannedStartDate: integer("planned_start_date", { mode: "timestamp" }),
-  plannedEndDate: integer("planned_end_date", { mode: "timestamp" }),
-  actualStartDate: integer("actual_start_date", { mode: "timestamp" }),
-  actualEndDate: integer("actual_end_date", { mode: "timestamp" }),
-  assignedTo: text("assigned_to").references(() => users.id),
+  workCenterId: text("work_center_id").references(() => workCenters.id),
+  description: text("description").notNull(),
+  status: text("status").default("pending"),
+  plannedHours: real("planned_hours"),
+  actualHours: real("actual_hours"),
+  startDate: text("start_date"),
+  endDate: text("end_date"),
   companyId: text("company_id").references(() => companies.id),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
+  createdAt: text("created_at").default(new Date().toISOString()),
+  updatedAt: text("updated_at").default(new Date().toISOString()),
 });
 
+// Manufacturing - Work Centers table
 export const workCenters = sqliteTable("work_centers", {
-  id: text("id").primaryKey().$default(() => generateUUID()),
+  id: text("id").primaryKey(),
   name: text("name").notNull(),
-  code: text("code").notNull().unique(),
-  type: text("type").notNull(),
-  capacity: text("capacity").default("1"),
-  efficiency: text("efficiency").default("100"),
-  status: text("status").default("active"),
-  location: text("location"),
+  description: text("description"),
+  capacity: real("capacity"),
+  efficiency: real("efficiency").default(1),
   companyId: text("company_id").references(() => companies.id),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
+  createdAt: text("created_at").default(new Date().toISOString()),
+  updatedAt: text("updated_at").default(new Date().toISOString()),
 });
 
+// Manufacturing - Bill of Materials table
 export const billOfMaterials = sqliteTable("bill_of_materials", {
-  id: text("id").primaryKey().$default(() => generateUUID()),
+  id: text("id").primaryKey(),
   productId: text("product_id").references(() => products.id),
   componentId: text("component_id").references(() => products.id),
-  quantity: text("quantity").notNull(),
+  quantity: real("quantity").notNull(),
   unit: text("unit").default("pcs"),
-  version: text("version").default("1"),
-  isActive: integer("is_active", { mode: "boolean" }).default(true),
   companyId: text("company_id").references(() => companies.id),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
+  createdAt: text("created_at").default(new Date().toISOString()),
+  updatedAt: text("updated_at").default(new Date().toISOString()),
 });
 
+// Manufacturing - Manufacturing Operations table
 export const manufacturingOperations = sqliteTable("manufacturing_operations", {
-  id: text("id").primaryKey().$default(() => generateUUID()),
+  id: text("id").primaryKey(),
   workOrderId: text("work_order_id").references(() => workOrders.id),
-  name: text("name").notNull(),
+  operation: text("operation").notNull(),
   description: text("description"),
   sequence: integer("sequence").notNull(),
-  duration: text("duration").notNull(),
-  unit: text("unit").default("minutes"),
-  state: text("state").default("pending"),
-  actualDuration: text("actual_duration"),
-  completedAt: integer("completed_at", { mode: "timestamp" }),
+  plannedTime: real("planned_time"),
+  actualTime: real("actual_time"),
+  status: text("status").default("pending"),
   companyId: text("company_id").references(() => companies.id),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
+  createdAt: text("created_at").default(new Date().toISOString()),
+  updatedAt: text("updated_at").default(new Date().toISOString()),
 });
 
-// Activities and Calendar
-export const activities = sqliteTable("activities", {
-  id: text("id").primaryKey().$default(() => generateUUID()),
-  type: text("type").notNull(),
-  summary: text("summary").notNull(),
+// Accounting - Chart of Accounts table
+export const chartOfAccounts = sqliteTable("chart_of_accounts", {
+  id: text("id").primaryKey(),
+  code: text("code").notNull(),
+  name: text("name").notNull(),
+  type: text("type").notNull(), // asset, liability, equity, revenue, expense
+  parentAccountId: text("parent_account_id"), // Remove foreign key constraint to avoid circular reference
+  isActive: integer("is_active").default(1),
+  companyId: text("company_id").references(() => companies.id),
+  createdAt: text("created_at").default(new Date().toISOString()),
+  updatedAt: text("updated_at").default(new Date().toISOString()),
+});
+
+// Accounting - Journal Entries table
+export const journalEntries = sqliteTable("journal_entries", {
+  id: text("id").primaryKey(),
+  entryNumber: text("entry_number").notNull(),
+  date: text("date").notNull(),
   description: text("description"),
-  startDate: integer("start_date", { mode: "timestamp" }),
-  endDate: integer("end_date", { mode: "timestamp" }),
-  assignedTo: text("assigned_to").references(() => users.id),
-  relatedRecord: text("related_record"),
+  reference: text("reference"),
+  status: text("status").default("draft"), // draft, posted
+  totalDebit: real("total_debit").default(0),
+  totalCredit: real("total_credit").default(0),
+  createdBy: text("created_by").references(() => users.id),
   companyId: text("company_id").references(() => companies.id),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
+  createdAt: text("created_at").default(new Date().toISOString()),
+  updatedAt: text("updated_at").default(new Date().toISOString()),
 });
 
-// Insert Schemas
+// Accounting - Journal Entry Lines table
+export const journalEntryLines = sqliteTable("journal_entry_lines", {
+  id: text("id").primaryKey(),
+  journalEntryId: text("journal_entry_id"), // Remove foreign key constraint
+  accountId: text("account_id"), // Remove foreign key constraint
+  description: text("description"),
+  debit: real("debit").default(0),
+  credit: real("credit").default(0),
+  companyId: text("company_id").references(() => companies.id),
+  createdAt: text("created_at").default(new Date().toISOString()),
+  updatedAt: text("updated_at").default(new Date().toISOString()),
+});
+
+// Accounting - Transactions table
+export const transactions = sqliteTable("transactions", {
+  id: text("id").primaryKey(),
+  transactionNumber: text("transaction_number").notNull(),
+  type: text("type").notNull(), // income, expense, transfer
+  description: text("description"),
+  amount: real("amount").notNull(),
+  date: text("date").notNull(),
+  categoryId: text("category_id"),
+  referenceId: text("reference_id"), // Reference to purchase order, sales order, etc.
+  referenceType: text("reference_type"), // purchase_order, sales_order, etc.
+  status: text("status").default("pending"), // pending, completed, cancelled
+  createdBy: text("created_by").references(() => users.id),
+  companyId: text("company_id").references(() => companies.id),
+  createdAt: text("created_at").default(new Date().toISOString()),
+  updatedAt: text("updated_at").default(new Date().toISOString()),
+});
+
+// Zod schemas for validation
 export const insertCompanySchema = createInsertSchema(companies);
 export const insertUserSchema = createInsertSchema(users);
 export const insertLeadSchema = createInsertSchema(leads);
@@ -472,70 +493,111 @@ export const insertApprovalRequestSchema = createInsertSchema(approvalRequests);
 export const insertApprovalWorkflowSchema = createInsertSchema(approvalWorkflows);
 export const insertEquipmentSchema = createInsertSchema(equipment);
 export const insertMaintenanceRequestSchema = createInsertSchema(maintenanceRequests);
-export const insertAccountSchema = createInsertSchema(accounts);
-export const insertJournalEntrySchema = createInsertSchema(journalEntries);
 export const insertProductionOrderSchema = createInsertSchema(productionOrders);
 export const insertWorkOrderSchema = createInsertSchema(workOrders);
 export const insertWorkCenterSchema = createInsertSchema(workCenters);
 export const insertBillOfMaterialSchema = createInsertSchema(billOfMaterials);
 export const insertManufacturingOperationSchema = createInsertSchema(manufacturingOperations);
+export const insertChartOfAccountsSchema = createInsertSchema(chartOfAccounts);
+export const insertJournalEntrySchema = createInsertSchema(journalEntries);
+export const insertJournalEntryLineSchema = createInsertSchema(journalEntryLines);
+export const insertTransactionSchema = createInsertSchema(transactions);
 
-// Type exports
-export type Company = typeof companies.$inferSelect;
+// Select schemas for return types
+export const selectCompanySchema = createSelectSchema(companies);
+export const selectUserSchema = createSelectSchema(users);
+export const selectLeadSchema = createSelectSchema(leads);
+export const selectOpportunitySchema = createSelectSchema(opportunities);
+export const selectPartnerSchema = createSelectSchema(partners);
+export const selectProductSchema = createSelectSchema(products);
+export const selectSalesOrderSchema = createSelectSchema(salesOrders);
+export const selectProjectSchema = createSelectSchema(projects);
+export const selectTaskSchema = createSelectSchema(tasks);
+export const selectEmployeeSchema = createSelectSchema(employees);
+export const selectActivitySchema = createSelectSchema(activities);
+export const selectPurchaseOrderSchema = createSelectSchema(purchaseOrders);
+export const selectEventSchema = createSelectSchema(events);
+export const selectEventRegistrationSchema = createSelectSchema(eventRegistrations);
+export const selectDocumentSchema = createSelectSchema(documents);
+export const selectDocumentFolderSchema = createSelectSchema(documentFolders);
+export const selectVehicleSchema = createSelectSchema(vehicles);
+export const selectVehicleMaintenanceSchema = createSelectSchema(vehicleMaintenance);
+export const selectApprovalRequestSchema = createSelectSchema(approvalRequests);
+export const selectApprovalWorkflowSchema = createSelectSchema(approvalWorkflows);
+export const selectEquipmentSchema = createSelectSchema(equipment);
+export const selectMaintenanceRequestSchema = createSelectSchema(maintenanceRequests);
+export const selectProductionOrderSchema = createSelectSchema(productionOrders);
+export const selectWorkOrderSchema = createSelectSchema(workOrders);
+export const selectWorkCenterSchema = createSelectSchema(workCenters);
+export const selectBillOfMaterialSchema = createSelectSchema(billOfMaterials);
+export const selectManufacturingOperationSchema = createSelectSchema(manufacturingOperations);
+export const selectChartOfAccountsSchema = createSelectSchema(chartOfAccounts);
+export const selectJournalEntrySchema = createSelectSchema(journalEntries);
+export const selectJournalEntryLineSchema = createSelectSchema(journalEntryLines);
+export const selectTransactionSchema = createSelectSchema(transactions);
+
+// TypeScript types
+export type Company = z.infer<typeof selectCompanySchema>;
+export type User = z.infer<typeof selectUserSchema>;
+export type Lead = z.infer<typeof selectLeadSchema>;
+export type Opportunity = z.infer<typeof selectOpportunitySchema>;
+export type Partner = z.infer<typeof selectPartnerSchema>;
+export type Product = z.infer<typeof selectProductSchema>;
+export type SalesOrder = z.infer<typeof selectSalesOrderSchema>;
+export type Project = z.infer<typeof selectProjectSchema>;
+export type Task = z.infer<typeof selectTaskSchema>;
+export type Employee = z.infer<typeof selectEmployeeSchema>;
+export type Activity = z.infer<typeof selectActivitySchema>;
+export type PurchaseOrder = z.infer<typeof selectPurchaseOrderSchema>;
+export type Event = z.infer<typeof selectEventSchema>;
+export type EventRegistration = z.infer<typeof selectEventRegistrationSchema>;
+export type Document = z.infer<typeof selectDocumentSchema>;
+export type DocumentFolder = z.infer<typeof selectDocumentFolderSchema>;
+export type Vehicle = z.infer<typeof selectVehicleSchema>;
+export type VehicleMaintenance = z.infer<typeof selectVehicleMaintenanceSchema>;
+export type ApprovalRequest = z.infer<typeof selectApprovalRequestSchema>;
+export type ApprovalWorkflow = z.infer<typeof selectApprovalWorkflowSchema>;
+export type Equipment = z.infer<typeof selectEquipmentSchema>;
+export type MaintenanceRequest = z.infer<typeof selectMaintenanceRequestSchema>;
+export type ProductionOrder = z.infer<typeof selectProductionOrderSchema>;
+export type WorkOrder = z.infer<typeof selectWorkOrderSchema>;
+export type WorkCenter = z.infer<typeof selectWorkCenterSchema>;
+export type BillOfMaterial = z.infer<typeof selectBillOfMaterialSchema>;
+export type ManufacturingOperation = z.infer<typeof selectManufacturingOperationSchema>;
+export type ChartOfAccounts = z.infer<typeof selectChartOfAccountsSchema>;
+export type JournalEntry = z.infer<typeof selectJournalEntrySchema>;
+export type JournalEntryLine = z.infer<typeof selectJournalEntryLineSchema>;
+export type Transaction = z.infer<typeof selectTransactionSchema>;
+
+// Insert types
 export type InsertCompany = z.infer<typeof insertCompanySchema>;
-export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
-export type Lead = typeof leads.$inferSelect;
 export type InsertLead = z.infer<typeof insertLeadSchema>;
-export type Opportunity = typeof opportunities.$inferSelect;
 export type InsertOpportunity = z.infer<typeof insertOpportunitySchema>;
-export type Partner = typeof partners.$inferSelect;
 export type InsertPartner = z.infer<typeof insertPartnerSchema>;
-export type Product = typeof products.$inferSelect;
 export type InsertProduct = z.infer<typeof insertProductSchema>;
-export type SalesOrder = typeof salesOrders.$inferSelect;
 export type InsertSalesOrder = z.infer<typeof insertSalesOrderSchema>;
-export type Project = typeof projects.$inferSelect;
 export type InsertProject = z.infer<typeof insertProjectSchema>;
-export type Task = typeof tasks.$inferSelect;
 export type InsertTask = z.infer<typeof insertTaskSchema>;
-export type Employee = typeof employees.$inferSelect;
 export type InsertEmployee = z.infer<typeof insertEmployeeSchema>;
-export type Activity = typeof activities.$inferSelect;
 export type InsertActivity = z.infer<typeof insertActivitySchema>;
-export type PurchaseOrder = typeof purchaseOrders.$inferSelect;
 export type InsertPurchaseOrder = z.infer<typeof insertPurchaseOrderSchema>;
-export type Event = typeof events.$inferSelect;
 export type InsertEvent = z.infer<typeof insertEventSchema>;
-export type EventRegistration = typeof eventRegistrations.$inferSelect;
 export type InsertEventRegistration = z.infer<typeof insertEventRegistrationSchema>;
-export type Document = typeof documents.$inferSelect;
 export type InsertDocument = z.infer<typeof insertDocumentSchema>;
-export type DocumentFolder = typeof documentFolders.$inferSelect;
 export type InsertDocumentFolder = z.infer<typeof insertDocumentFolderSchema>;
-export type Vehicle = typeof vehicles.$inferSelect;
 export type InsertVehicle = z.infer<typeof insertVehicleSchema>;
-export type VehicleMaintenance = typeof vehicleMaintenance.$inferSelect;
 export type InsertVehicleMaintenance = z.infer<typeof insertVehicleMaintenanceSchema>;
-export type ApprovalRequest = typeof approvalRequests.$inferSelect;
 export type InsertApprovalRequest = z.infer<typeof insertApprovalRequestSchema>;
-export type ApprovalWorkflow = typeof approvalWorkflows.$inferSelect;
 export type InsertApprovalWorkflow = z.infer<typeof insertApprovalWorkflowSchema>;
-export type Equipment = typeof equipment.$inferSelect;
 export type InsertEquipment = z.infer<typeof insertEquipmentSchema>;
-export type MaintenanceRequest = typeof maintenanceRequests.$inferSelect;
 export type InsertMaintenanceRequest = z.infer<typeof insertMaintenanceRequestSchema>;
-export type Account = typeof accounts.$inferSelect;
-export type InsertAccount = z.infer<typeof insertAccountSchema>;
-export type JournalEntry = typeof journalEntries.$inferSelect;
-export type InsertJournalEntry = z.infer<typeof insertJournalEntrySchema>;
-export type ProductionOrder = typeof productionOrders.$inferSelect;
 export type InsertProductionOrder = z.infer<typeof insertProductionOrderSchema>;
-export type WorkOrder = typeof workOrders.$inferSelect;
 export type InsertWorkOrder = z.infer<typeof insertWorkOrderSchema>;
-export type WorkCenter = typeof workCenters.$inferSelect;
 export type InsertWorkCenter = z.infer<typeof insertWorkCenterSchema>;
-export type BillOfMaterial = typeof billOfMaterials.$inferSelect;
 export type InsertBillOfMaterial = z.infer<typeof insertBillOfMaterialSchema>;
-export type ManufacturingOperation = typeof manufacturingOperations.$inferSelect;
 export type InsertManufacturingOperation = z.infer<typeof insertManufacturingOperationSchema>;
+export type InsertChartOfAccounts = z.infer<typeof insertChartOfAccountsSchema>;
+export type InsertJournalEntry = z.infer<typeof insertJournalEntrySchema>;
+export type InsertJournalEntryLine = z.infer<typeof insertJournalEntryLineSchema>;
+export type InsertTransaction = z.infer<typeof insertTransactionSchema>;

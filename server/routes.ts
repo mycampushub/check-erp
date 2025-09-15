@@ -10,12 +10,30 @@ import {
   insertVehicleMaintenanceSchema, insertApprovalRequestSchema, insertApprovalWorkflowSchema,
   insertEquipmentSchema, insertMaintenanceRequestSchema, insertUserSchema, insertCompanySchema,
   insertProductionOrderSchema, insertWorkOrderSchema, insertWorkCenterSchema,
-  insertBillOfMaterialSchema, insertManufacturingOperationSchema
+  insertBillOfMaterialSchema, insertManufacturingOperationSchema,
+  insertChartOfAccountsSchema, insertJournalEntrySchema, insertJournalEntryLineSchema, insertTransactionSchema
 } from "@shared/schema";
 import bcrypt from "bcryptjs";
+import session from "express-session";
+import MemoryStore from "memorystore";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const currentCompanyId = "default-company"; // In real app, this would come from session
+
+  // Session middleware
+  const MemoryStoreSession = MemoryStore(session);
+  app.use(session({
+    secret: "your-secret-key-change-in-production",
+    resave: false,
+    saveUninitialized: false,
+    store: new MemoryStoreSession({
+      checkPeriod: 86400000 // prune expired entries every 24h
+    }),
+    cookie: {
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    }
+  }));
 
   // Authentication endpoints
   app.post("/api/auth/login", async (req, res) => {
@@ -35,6 +53,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!user.isActive) {
         return res.status(401).json({ error: "Account is disabled" });
       }
+
+      // Store user in session
+      req.session.userId = user.id;
 
       // Remove password from response
       const { password: _, ...userWithoutPassword } = user;
@@ -79,8 +100,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/auth/me", async (req, res) => {
     try {
-      // In a real app, this would get user from session/token
-      const user = await storage.getUserByUsername("admin");
+      const userId = req.session.userId;
+      
+      if (!userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const user = await storage.getUser(userId);
       if (!user) {
         return res.status(401).json({ error: "Not authenticated" });
       }
@@ -89,6 +115,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(userWithoutPassword);
     } catch (error) {
       res.status(500).json({ error: "Failed to get user" });
+    }
+  });
+
+  app.post("/api/auth/logout", async (req, res) => {
+    try {
+      req.session.destroy((err) => {
+        if (err) {
+          return res.status(500).json({ error: "Failed to logout" });
+        }
+        res.json({ message: "Logout successful" });
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to logout" });
     }
   });
 
@@ -1135,7 +1174,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       res.status(400).json({ error: "Failed to delete manufacturing operation" });
     }
+  
+  // Accounting endpoints
+  app.get("/api/transactions", async (req, res) => {
+    try {
+      const transactions = await storage.getTransactions(currentCompanyId);
+      res.json(transactions);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch transactions" });
+    }
   });
+
+  app.post("/api/transactions", async (req, res) => {
+    try {
+      const validatedData = insertTransactionSchema.parse(req.body);
+      const transaction = await storage.createTransaction({
+        ...validatedData,
+        companyId: currentCompanyId
+      });
+      res.status(201).json(transaction);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid transaction data" });
+    }
+  });
+
+  app.patch("/api/transactions/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const validatedData = insertTransactionSchema.partial().parse(req.body);
+      const transaction = await storage.updateTransaction(id, validatedData);
+      res.json(transaction);
+    } catch (error) {
+      res.status(400).json({ error: "Failed to update transaction" });
+    }
+  });
+
+  app.delete("/api/transactions/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteTransaction(id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(400).json({ error: "Failed to delete transaction" });
+    }
+  });
+
+  app.get("/api/chart-of-accounts", async (req, res) => {
+    try {
+      const accounts = await storage.getChartOfAccounts(currentCompanyId);
+      res.json(accounts);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch chart of accounts" });
+    }
+  });
+
+  app.post("/api/chart-of-accounts", async (req, res) => {
+    try {
+      const validatedData = insertChartOfAccountsSchema.parse(req.body);
+      const account = await storage.createChartOfAccount({
+        ...validatedData,
+        companyId: currentCompanyId
+      });
+      res.status(201).json(account);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid account data" });
+    }
+  });
+
+});
 
   const httpServer = createServer(app);
   return httpServer;

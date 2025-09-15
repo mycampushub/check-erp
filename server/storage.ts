@@ -211,11 +211,280 @@ export class DatabaseStorage implements IStorage {
           name: "System Administrator",
           password: hashedPassword,
           companyId: "default-company",
-          isActive: true,
+          isActive: 1,
           roles: ["admin"],
           settings: {}
         });
       }
+
+      // Create sample products
+      const existingProducts = await db.select().from(products).limit(1);
+      if (existingProducts.length === 0) {
+        await db.insert(products).values([
+          {
+            id: "product-1",
+            name: "Laptop",
+            sku: "LAP-001",
+            description: "High-performance laptop",
+            category: "Electronics",
+            price: 999.99,
+            cost: 699.99,
+            quantity: 50,
+            unit: "pcs",
+            companyId: "default-company"
+          },
+          {
+            id: "product-2",
+            name: "Smartphone",
+            sku: "PHN-001",
+            description: "Latest smartphone model",
+            category: "Electronics",
+            price: 699.99,
+            cost: 499.99,
+            quantity: 100,
+            unit: "pcs",
+            companyId: "default-company"
+          },
+          {
+            id: "product-3",
+            name: "Desk Chair",
+            sku: "CHR-001",
+            description: "Ergonomic office chair",
+            category: "Furniture",
+            price: 199.99,
+            cost: 129.99,
+            quantity: 25,
+            unit: "pcs",
+            companyId: "default-company"
+          }
+        ]);
+      }
+
+      // Create sample partners
+      const existingPartners = await db.select().from(partners).limit(1);
+      if (existingPartners.length === 0) {
+        await db.insert(partners).values([
+          {
+            id: "partner-1",
+            name: "Tech Supplies Inc.",
+            type: "supplier",
+            email: "contact@techsupplies.com",
+            phone: "555-0101",
+            address: "123 Tech Street",
+            city: "Tech City",
+            state: "TC",
+            country: "USA",
+            isCustomer: 0,
+            isSupplier: 1,
+            companyId: "default-company"
+          },
+          {
+            id: "partner-2",
+            name: "ABC Corporation",
+            type: "customer",
+            email: "sales@abccorp.com",
+            phone: "555-0202",
+            address: "456 Business Ave",
+            city: "Business City",
+            state: "BC",
+            country: "USA",
+            isCustomer: 1,
+            isSupplier: 0,
+            companyId: "default-company"
+          }
+        ]);
+      }
+
+      // Create sample manufacturing data
+      const existingProductionOrders = await db.select().from(productionOrders).limit(1);
+      if (existingProductionOrders.length === 0) {
+        await db.insert(productionOrders).values([
+          {
+            id: "po-1",
+            orderNumber: "PO-2024-001",
+            productId: "product-1",
+            quantity: 100,
+            status: "in-progress",
+            startDate: new Date().toISOString(),
+            priority: "high",
+            companyId: "default-company"
+          },
+          {
+            id: "po-2",
+            orderNumber: "PO-2024-002",
+            productId: "product-2",
+            quantity: 200,
+            status: "planned",
+            priority: "medium",
+            companyId: "default-company"
+          }
+        ]);
+
+        // Create work centers
+        await db.insert(workCenters).values([
+          {
+            id: "wc-1",
+            name: "Assembly Line",
+            description: "Main assembly workstation",
+            capacity: 50,
+            efficiency: 0.9,
+            companyId: "default-company"
+          },
+          {
+            id: "wc-2",
+            name: "Quality Control",
+            description: "Quality inspection station",
+            capacity: 30,
+            efficiency: 1.0,
+            companyId: "default-company"
+          }
+        ]);
+
+        // Create work orders
+        await db.insert(workOrders).values([
+          {
+            id: "wo-1",
+            productionOrderId: "po-1",
+            workCenterId: "wc-1",
+            description: "Assemble laptop units",
+            status: "in-progress",
+            plannedHours: 40,
+            startDate: new Date().toISOString(),
+            companyId: "default-company"
+          }
+        ]);
+      }
+
+      // Create sample projects
+      const existingProjects = await db.select().from(projects).limit(1);
+      if (existingProjects.length === 0) {
+        await db.insert(projects).values([
+          {
+            id: "project-1",
+            name: "Website Redesign",
+            description: "Complete redesign of company website",
+            status: "in-progress",
+            startDate: new Date().toISOString(),
+            budget: 25000,
+            companyId: "default-company"
+          },
+          {
+            id: "project-2",
+            name: "Mobile App Development",
+            description: "Develop new mobile application",
+            status: "planning",
+            budget: 50000,
+            companyId: "default-company"
+          }
+        ]);
+
+        // Create project tasks
+        await db.insert(tasks).values([
+          {
+            id: "task-1",
+            title: "Design UI/UX",
+            description: "Create wireframes and mockups",
+            status: "in-progress",
+            priority: "high",
+            projectId: "project-1",
+            companyId: "default-company"
+          },
+          {
+            id: "task-2",
+            title: "Backend Development",
+            description: "Develop API and database",
+            status: "todo",
+            priority: "medium",
+            projectId: "project-1",
+            companyId: "default-company"
+          }
+        ]);
+      }
+
+      // Create sample purchase orders
+      const existingPurchaseOrders = await db.select().from(purchaseOrders).limit(1);
+      if (existingPurchaseOrders.length === 0) {
+        await db.insert(purchaseOrders).values([
+          {
+            id: "pur-1",
+            orderNumber: "PUR-2024-001",
+            supplierId: "partner-1",
+            orderDate: new Date().toISOString(),
+            status: "pending",
+            subtotal: 5000,
+            tax: 400,
+            total: 5400,
+            companyId: "default-company"
+          },
+          {
+            id: "pur-2",
+            orderNumber: "PUR-2024-002",
+            supplierId: "partner-1",
+            orderDate: new Date().toISOString(),
+            status: "approved",
+            subtotal: 3000,
+            tax: 240,
+            total: 3240,
+            companyId: "default-company"
+          }
+        ]);
+      }
+
+      // Create sample sales orders
+      const existingSalesOrders = await db.select().from(salesOrders).limit(1);
+      if (existingSalesOrders.length === 0) {
+        await db.insert(salesOrders).values([
+          {
+            id: "so-1",
+            orderNumber: "SO-2024-001",
+            customerId: "partner-2",
+            orderDate: new Date().toISOString(),
+            status: "delivered",
+            subtotal: 15000,
+            tax: 1200,
+            total: 16200,
+            companyId: "default-company"
+          },
+          {
+            id: "so-2",
+            orderNumber: "SO-2024-002",
+            customerId: "partner-2",
+            orderDate: new Date().toISOString(),
+            status: "processing",
+            subtotal: 8000,
+            tax: 640,
+            total: 8640,
+            companyId: "default-company"
+          }
+        ]);
+      }
+
+      // Create sample employees
+      const existingEmployees = await db.select().from(employees).limit(1);
+      if (existingEmployees.length === 0) {
+        await db.insert(employees).values([
+          {
+            id: "emp-1",
+            employeeId: "EMP-001",
+            department: "Engineering",
+            position: "Software Engineer",
+            hireDate: new Date().toISOString(),
+            salary: 75000,
+            companyId: "default-company"
+          },
+          {
+            id: "emp-2",
+            employeeId: "EMP-002",
+            department: "Sales",
+            position: "Sales Representative",
+            hireDate: new Date().toISOString(),
+            salary: 55000,
+            companyId: "default-company"
+          }
+        ]);
+      }
+
+      console.log("Sample data initialized successfully");
     } catch (error) {
       console.error("Error initializing default data:", error);
     }
